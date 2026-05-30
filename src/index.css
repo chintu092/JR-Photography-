@@ -1,0 +1,345 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Epilogue:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --luxury-black: #0C0F0A;
+  --luxury-charcoal: #151A10;
+  --luxury-gold: #B7BE43; /* Lime Green as primary */
+  --luxury-cream: #E9E9E7; /* Soft White */
+  --luxury-gray: #999F94; /* Soft sage/olive grey */
+  --olive-green: #6D8E1B;
+  --deep-teal: #1E5662;
+  --dark-olive: #3E4A18;
+}
+
+[data-theme="light"] {
+  --luxury-black: #E9E9E7; /* Gallery White - Soft White archival paper background */
+  --luxury-charcoal: #FFFFFF; /* Pure white crisp card and layout modules */
+  --luxury-gold: #6D8E1B; /* Olive Green for elegant and highly readable accents */
+  --luxury-cream: #0C0F0A; /* Deep obsidian black for headings and primary texts */
+  --luxury-gray: #3E4A18; /* Dark Olive for high contrast, detail-oriented labels & sub-texts */
+  --olive-green: #6D8E1B;
+  --deep-teal: #1E5662;
+  --dark-olive: #3E4A18;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Epilogue", sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-luxury-black: var(--luxury-black);
+  --color-luxury-charcoal: var(--luxury-charcoal);
+  --color-luxury-gold: var(--luxury-gold);
+  --color-luxury-cream: var(--luxury-cream);
+  --color-luxury-gray: var(--luxury-gray);
+  --color-olive-green: var(--olive-green);
+  --color-deep-teal: var(--deep-teal);
+  --color-dark-olive: var(--dark-olive);
+  
+  --animate-marquee: marquee 35s linear infinite;
+  --animate-scroll-left: scroll-left 45s linear infinite;
+  --animate-scroll-right: scroll-right 45s linear infinite;
+  --animate-scroll-up: scroll-up 35s linear infinite;
+  --animate-scroll-down: scroll-down 35s linear infinite;
+  
+  @keyframes marquee {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+  }
+  
+  @keyframes scroll-left {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-33.333333%); }
+  }
+
+  @keyframes scroll-right {
+    0% { transform: translateX(-33.333333%); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes scroll-up {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-50%); }
+  }
+
+  @keyframes scroll-down {
+    0% { transform: translateY(-50%); }
+    100% { transform: translateY(0); }
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0C0F0A;
+}
+::-webkit-scrollbar-thumb {
+  background: #3E4A18;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B7BE43;
+}
+
+/* Grain Noise Overlay */
+.grain-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.045'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(30, 86, 98, 0.12); /* Deep Teal with opacity */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(233, 233, 231, 0.08); /* Soft white border */
+}
+
+.glass-panel-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(30, 86, 98, 0.2);
+  border-color: rgba(183, 190, 67, 0.3); /* Lime Green glow border */
+  box-shadow: 0 10px 40px -10px rgba(183, 190, 67, 0.12);
+}
+
+/* Utilities for smooth scrolls and interactive features */
+html {
+  scroll-behavior: smooth;
+  background-color: #0C0F0A;
+}
+
+/* Smooth zoom-in container */
+.zoom-container {
+  overflow: hidden;
+}
+.zoom-image {
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.zoom-container:hover .zoom-image {
+  transform: scale(1.08);
+}
+
+/* Smooth global layout morph transitions when switching themes */
+body, main, section, footer, header, .glass-panel, .bg-luxury-black, .bg-luxury-charcoal, .text-luxury-cream, .text-luxury-gray {
+  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+}
+
+/* Light Mode Overrides for Transparency & Solid Counterparts */
+[data-theme="light"] {
+  background-color: #E9E9E7;
+  color: #0C0F0A;
+}
+[data-theme="light"] html {
+  background-color: #E9E9E7;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #E9E9E7;
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #6D8E1B;
+}
+
+/* Redefine transparent border classes on light theme for stunning visibility */
+[data-theme="light"] .border-white\/5 {
+  border-color: rgba(15, 18, 14, 0.08) !important;
+}
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(15, 18, 14, 0.14) !important;
+}
+[data-theme="light"] .border-white\/20 {
+  border-color: rgba(15, 18, 14, 0.24) !important;
+}
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(15, 18, 14, 0.04) !important;
+}
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(15, 18, 14, 0.08) !important;
+}
+[data-theme="light"] .bg-white {
+  background-color: #0C0F0A !important;
+  color: #E9E9E7 !important;
+}
+[data-theme="light"] .text-black {
+  color: #E9E9E7 !important;
+}
+[data-theme="light"] .bg-black {
+  background-color: #FFFFFF !important;
+  color: #0C0F0A !important;
+}
+[data-theme="light"] .text-white {
+  color: #0C0F0A !important;
+}
+
+/* Class-based containers translation on light theme to prevent dark-on-dark blocks */
+[data-theme="light"] .bg-\[\#0E0E0E\] {
+  background-color: #E9E9E7 !important; /* Soft White */
+}
+[data-theme="light"] .bg-\[\#0B0B0B\] {
+  background-color: #E9E9E7 !important; /* Soft White */
+}
+[data-theme="light"] .bg-\[\#000\] {
+  background-color: #E9E9E7 !important; /* Soft White */
+}
+[data-theme="light"] .bg-\[\#111\] {
+  background-color: #FFFFFF !important; /* Pure White card */
+  border-color: rgba(15, 18, 14, 0.12) !important;
+  color: #0C0F0A !important;
+}
+[data-theme="light"] .bg-\[\#111\]\/50 {
+  background-color: rgba(255, 255, 255, 0.65) !important; /* Translucent Card */
+}
+[data-theme="light"] .bg-\[\#111\]\/40 {
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+[data-theme="light"] .bg-\[\#111\]\/30 {
+  background-color: rgba(255, 255, 255, 0.35) !important;
+}
+[data-theme="light"] .bg-\[\#121611\]\/60 {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(15, 18, 14, 0.1) !important;
+}
+[data-theme="light"] .bg-\[\#121611\]\/40 {
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+[data-theme="light"] .bg-\[\#111310\] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+[data-theme="light"] .bg-\[\#111310\]\/80 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+[data-theme="light"] .bg-\[\#111310\]\/90 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+[data-theme="light"] .bg-\[\#0C0F0A\]\/85 {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+[data-theme="light"] .bg-\[\#0C0F0A\]\/80 {
+  background-color: rgba(233, 233, 231, 0.82) !important;
+}
+[data-theme="light"] .bg-\[\#0C0F0A\]\/90 {
+  background-color: rgba(233, 233, 231, 0.9) !important;
+}
+[data-theme="light"] .bg-\[\#0C0F0A\]\/95 {
+  background-color: rgba(233, 233, 231, 0.95) !important;
+}
+[data-theme="light"] .bg-\[\#121611\] {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+[data-theme="light"] .bg-\[\#070707\] {
+  background-color: #FFFFFF !important;
+}
+[data-theme="light"] .bg-\[\#0A0D08\] {
+  background-color: #FFFFFF !important;
+}
+[data-theme="light"] .bg-black\/30 {
+  background-color: rgba(15, 18, 14, 0.05) !important;
+}
+
+/* Replace hardcoded text-color links that target light theme to turn dark olive */
+[data-theme="light"] .text-\[\#B7BE43\] {
+  color: #6D8E1B !important; /* Olive Green as contrast fallback for text and tags */
+}
+[data-theme="light"] .bg-\[\#B7BE43\] {
+  background-color: #6D8E1B !important; /* Olive Green for badges and triggers */
+  color: #E9E9E7 !important;
+}
+[data-theme="light"] .border-\[\#B7BE43\] {
+  border-color: #6D8E1B !important;
+}
+
+/* Glassmorphism adjustment on Light Mode */
+[data-theme="light"] .glass-panel {
+  background: rgba(30, 86, 98, 0.05) !important;
+  border-color: rgba(15, 18, 14, 0.08) !important;
+}
+[data-theme="light"] .glass-panel-hover:hover {
+  background: rgba(30, 86, 98, 0.1) !important;
+  border-color: rgba(115, 123, 18, 0.3) !important;
+}
+
+/* Header dynamic background in Light Mode */
+[data-theme="light"] .bg-luxury-black\/70 {
+  background-color: rgba(248, 249, 250, 0.75) !important;
+}
+
+/* Sub-typography adjustment to assure beautiful contrast without code noise */
+[data-theme="light"] .text-zinc-300 {
+  color: #121611 !important;
+}
+[data-theme="light"] .text-zinc-400 {
+  color: #4A5044 !important;
+}
+[data-theme="light"] .text-zinc-500 {
+  color: #586050 !important;
+}
+[data-theme="light"] .text-zinc-600 {
+  color: #6C7564 !important;
+}
+
+/* Hero elements opacity contrast adjustment on Light Mode */
+[data-theme="light"] .opacity-5 {
+  opacity: 0.15 !important;
+}
+[data-theme="light"] .opacity-10 {
+  opacity: 0.2 !important;
+}
+[data-theme="light"] .opacity-20 {
+  opacity: 0.3 !important;
+}
+[data-theme="light"] .opacity-40 {
+  opacity: 0.55 !important;
+}
+[data-theme="light"] .opacity-60 {
+  opacity: 0.75 !important;
+}
+[data-theme="light"] .opacity-80 {
+  opacity: 0.9 !important;
+}
+
+/* CTA Navigation button state override */
+[data-theme="light"] #nav-cta-btn {
+  background-color: #0F120E !important;
+  color: #FFFFFF !important;
+}
+[data-theme="light"] #nav-cta-btn:hover {
+  background-color: var(--luxury-gold) !important;
+  color: #0F120E !important;
+}
+
+/* Selection context dynamic override for light mode */
+[data-theme="light"] ::selection {
+  background-color: var(--luxury-gold);
+  color: #0F120E;
+}
+
+/* Parallax descriptions text-[#eee] and floating badge bg-black/60 contrast correction in light mode */
+[data-theme="light"] .text-\[\#eee\] {
+  color: #0C0F0A !important;
+}
+[data-theme="light"] .bg-black\/60 {
+  background-color: rgba(255, 255, 255, 0.75) !important;
+  color: #0C0F0A !important;
+}
+[data-theme="light"] .bg-black\/60 svg {
+  color: #6D8E1B !important; /* Olive Green icon */
+}
+[data-theme="light"] .bg-black\/60 span {
+  color: #0C0F0A !important;
+}
+[data-theme="light"] .bg-black\/60 {
+  border-color: rgba(15, 18, 14, 0.15) !important;
+}
+

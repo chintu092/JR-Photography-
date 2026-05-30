@@ -1,0 +1,6 @@
+{
+  "name": "JR Photography",
+  "description": "Inspired by the high-end minimalist Rebirth portfolio layout. JR Photography specializes in fine-art fashion editorials, luxury weddings, and cinematic portraiture with fluid GSAP scroll interactions, beautiful serif typography, and a prestige dark mode canvas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
