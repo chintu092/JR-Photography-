@@ -67,7 +67,7 @@ export default function Contact() {
       {/* Background soft ambiance lights */}
       <div className="absolute top-1/2 left-[10%] w-[35rem] h-[35rem] bg-luxury-gold/3 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
         
         {/* Core Big Call to Action */}
         <div className="text-center space-y-6 mb-20 md:mb-28">

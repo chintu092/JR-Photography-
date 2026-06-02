@@ -27,7 +27,7 @@ export default function Founder() {
         Meet Jayanta
       </div>
 
-      <div className="max-w-6xl mx-auto relative z-10">
+      <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] 3xl:max-w-[1600px] mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-16 lg:gap-24 items-center">
           
           {/* Left Column: Portrait Frame with award badge and hover triggers */}

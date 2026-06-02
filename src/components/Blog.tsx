@@ -27,7 +27,7 @@ export default function Blog({ onSelectBlog }: BlogProps) {
       <div className="absolute top-1/3 right-[10%] w-[350px] h-[350px] bg-deep-teal/5 rounded-full filter blur-[110px] pointer-events-none" />
       <div className="absolute bottom-1/4 left-[8%] w-[400px] h-[400px] bg-dark-olive/4 rounded-full filter blur-[120px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16 md:mb-24">

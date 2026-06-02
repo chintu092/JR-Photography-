@@ -121,7 +121,7 @@ export default function Portfolio({ onSelectWork }: PortfolioProps) {
       <div className="absolute top-1/4 right-[5%] w-[400px] h-[400px] bg-deep-teal/4 rounded-full filter blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-10 left-[8%] w-[350px] h-[350px] bg-dark-olive/5 rounded-full filter blur-[100px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-16 md:mb-20 gap-8">
@@ -181,7 +181,7 @@ export default function Portfolio({ onSelectWork }: PortfolioProps) {
             {WORK_ITEMS.map((work, idx) => (
               <div
                 key={work.id}
-                className="snap-center shrink-0 w-[85vw] sm:w-[480px] md:w-[520px] lg:w-[580px] h-[520px] md:h-[600px] relative rounded-[36px] overflow-hidden bg-luxury-charcoal border border-white/5 cursor-pointer"
+                className="snap-center shrink-0 w-[85vw] sm:w-[480px] md:w-[520px] lg:w-[580px] xl:w-[680px] 2xl:w-[740px] 3xl:w-[840px] h-[520px] md:h-[600px] xl:h-[680px] 2xl:h-[750px] relative rounded-[36px] overflow-hidden bg-luxury-charcoal border border-white/5 cursor-pointer"
                 onClick={() => {
                   if (isDragging) return; // ignore click on drag release
                   audioService.playClick();

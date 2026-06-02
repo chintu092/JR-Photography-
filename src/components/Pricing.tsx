@@ -258,7 +258,7 @@ export default function Pricing() {
       <div className="absolute top-[30%] right-[5%] w-[45rem] h-[45rem] bg-luxury-gold/5 rounded-full filter blur-3xl pointer-events-none" />
       <div className="absolute bottom-[20%] left-[5%] w-[35rem] h-[35rem] bg-[#DE8E67]/3 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-5xl mx-auto relative z-10">
+      <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl 3xl:max-w-[1440px] mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 md:mb-28 gap-6">

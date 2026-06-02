@@ -132,7 +132,7 @@ export default function Hero() {
       {/* Background radial soft spots */}
       <div className="absolute top-1/4 left-1/4 -translate-y-1/2 w-[40rem] h-[40rem] bg-zinc-900/40 rounded-full filter blur-[150px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-6 md:px-12 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center relative z-10">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto px-6 md:px-12 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center relative z-10">
         
         {/* LEFT COLUMN: Editorial Big Typo and CTA Controls */}
         <div className="lg:col-span-6 xl:col-span-5 flex flex-col justify-center items-start text-left z-20 space-y-6 max-w-xl">
@@ -148,7 +148,7 @@ export default function Hero() {
             <span className="font-serif italic font-light text-luxury-gold tracking-normal lowercase block mt-2">Timeless Moments.</span>
           </h1>
 
-          <p className="text-luxury-gray text-xs sm:text-sm md:text-base font-light leading-relaxed max-w-md pt-2">
+          <p className="text-luxury-gray text-xs sm:text-sm md:text-base font-light leading-relaxed max-w-md xl:max-w-lg pt-2">
             JR Studio connects visionary businesses with high-fidelity creators for premium, high-contrast, beautiful editorial imagery and cinematic campaigns.
           </p>
 
@@ -180,7 +180,7 @@ export default function Hero() {
         </div>
 
         {/* RIGHT COLUMN: Infinite Dual-Column Auto-scrolling grid */}
-        <div className="lg:col-span-6 xl:col-span-7 h-[500px] sm:h-[600px] md:h-[650px] lg:h-[720px] relative w-full overflow-hidden [mask-image:_linear-gradient(to_bottom,transparent_0%,_black_12%,_black_88%,transparent_100%)] z-10 grid grid-cols-2 gap-4 sm:gap-6 px-1">
+        <div className="lg:col-span-6 xl:col-span-7 h-[500px] sm:h-[600px] md:h-[650px] lg:h-[720px] xl:h-[780px] 2xl:h-[880px] relative w-full overflow-hidden [mask-image:_linear-gradient(to_bottom,transparent_0%,_black_12%,_black_88%,transparent_100%)] z-10 grid grid-cols-2 gap-4 sm:gap-6 px-1">
           
           {/* Scroll Up Column */}
           <div className="flex flex-col gap-4 sm:gap-6 animate-scroll-up hover:[animation-play-state:paused] h-max py-2">
@@ -264,7 +264,7 @@ export default function Hero() {
 
       {/* Elegant Bottom Status & Scroll Indicator Bar */}
       <div className="absolute bottom-6 sm:bottom-8 left-0 right-0 z-20 w-full px-1">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 w-full">
+        <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto px-6 md:px-12 w-full">
           <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] select-none">
             
             {/* Left side: Locations and Reel Status */}

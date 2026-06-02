@@ -44,7 +44,7 @@ export default function Footer({ onNavigate }: FooterProps) {
     <footer className="relative bg-[#000] text-luxury-cream border-t border-white/5 py-16 md:py-24 px-6 md:px-12 select-none">
       
       {/* Footer Grid links */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 md:pb-24 border-b border-white/5 relative z-10">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 md:pb-24 border-b border-white/5 relative z-10">
         
         {/* Column 1: Core logo, brand summary, and Sound control switcher */}
         <div className="md:col-span-4 space-y-6">
@@ -191,14 +191,14 @@ export default function Footer({ onNavigate }: FooterProps) {
       </div>
 
       {/* Large decorative logo */}
-      <div className="max-w-7xl mx-auto py-12 select-none opacity-[0.03] border-b border-white/5 flex justify-center">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto py-12 select-none opacity-[0.03] border-b border-white/5 flex justify-center">
         <div className="w-48 md:w-64">
           <Logo variant="full" />
         </div>
       </div>
 
       {/* Copyrights & credits bottom */}
-      <div className="max-w-7xl mx-auto pt-8 flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono text-zinc-600 gap-4">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto pt-8 flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono text-zinc-600 gap-4">
         
         <div className="flex items-center space-x-2">
           <span>© 2026 JR PHOTOGRAPHY STUDIO. All rights reserved globally.</span>

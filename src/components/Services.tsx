@@ -13,7 +13,7 @@ export default function Services() {
       <div className="absolute top-[30%] left-[20%] w-[35rem] h-[35rem] bg-luxury-gold/5 rounded-full filter blur-3xl pointer-events-none" />
       <div className="absolute bottom-[20%] right-[10%] w-[35rem] h-[35rem] bg-luxury-gold/3 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 md:mb-24 gap-6">
