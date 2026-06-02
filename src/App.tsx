@@ -10,6 +10,7 @@ import Hero from "./components/Hero";
 import Marquee from "./components/Marquee";
 import About from "./components/About";
 import Services from "./components/Services";
+import ComparisonSlider from "./components/ComparisonSlider";
 import Portfolio from "./components/Portfolio";
 import Testimonials from "./components/Testimonials";
 import Founder from "./components/Founder";
@@ -18,6 +19,7 @@ import Pricing from "./components/Pricing";
 import FAQ from "./components/FAQ";
 import Contact from "./components/Contact";
 import Footer from "./components/Footer";
+import { BEFORE_AFTER_IMAGE } from "./data";
 import ParallaxDivider from "./components/ParallaxDivider";
 import Blog from "./components/Blog";
 import BlogDetail from "./components/BlogDetail";
@@ -265,6 +267,12 @@ export default function App() {
             <Marquee />
             <About />
             <Services />
+            <ComparisonSlider
+              beforeImg={BEFORE_AFTER_IMAGE.before}
+              afterImg={BEFORE_AFTER_IMAGE.after}
+              title="COLOR SCIENCE LABORATORY"
+              description="Experience the delicate balance of light and color with our interactive retouching laboratory."
+            />
             {/* <UploadSection /> */}
             
             {/* Luxury Weddings Divider */}

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { WORK_ITEMS, BEFORE_AFTER_IMAGE } from "../data";
+import { WORK_ITEMS } from "../data";
 import { WorkItem } from "../types";
 import { audioService } from "../utils/audio";
 import { X, Sparkles, Play, CheckCircle2, Compass, ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,10 +12,6 @@ interface PortfolioProps {
 export default function Portfolio({ onSelectWork }: PortfolioProps) {
   const [selectedCaseStudy, setSelectedCaseStudy] = useState<WorkItem | null>(null);
   
-  // Before/after state
-  const [sliderPosition, setSliderPosition] = useState<number>(50);
-  const [isSliding, setIsSliding] = useState<boolean>(false);
-
   // Video lightbox state
   const [videoOpen, setVideoOpen] = useState<boolean>(false);
 
@@ -29,25 +25,6 @@ export default function Portfolio({ onSelectWork }: PortfolioProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeftState, setScrollLeftState] = useState(0);
-
-  // Before/after offset calculation
-  const handleMove = (clientX: number, containerRect: DOMRect) => {
-    const x = clientX - containerRect.left;
-    const progress = Math.max(0, Math.min(100, (x / containerRect.width) * 100));
-    setSliderPosition(progress);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    handleMove(e.touches[0].clientX, rect);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.buttons === 1 || isSliding) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      handleMove(e.clientX, rect);
-    }
-  };
 
   const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>, cardId: string) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -280,110 +257,7 @@ export default function Portfolio({ onSelectWork }: PortfolioProps) {
         </div>
 
         {/* --- RAW vs. retouched Before/After Comparison Section --- */}
-        <div className="mt-32 bg-[#121611]/80 backdrop-blur-xl border border-white/5 rounded-[40px] p-8 md:p-12 lg:p-16 relative overflow-hidden">
-          {/* Subtle colored spotlight blob */}
-          <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-[300px] h-[300px] bg-deep-teal/10 rounded-full filter blur-[100px] pointer-events-none" />
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
-            
-            {/* Context Left */}
-            <div className="lg:col-span-12 xl:col-span-5 space-y-6">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-4 h-4 text-luxury-gold" />
-                <span className="text-xs font-mono text-luxury-gold tracking-widest uppercase font-bold">LAB & COLOR ROOM</span>
-              </div>
-              <h3 className="font-display font-medium text-3xl sm:text-4xl text-luxury-cream uppercase leading-[1.1] tracking-tight">
-                {BEFORE_AFTER_IMAGE.title}
-              </h3>
-              <p className="text-xs sm:text-sm text-luxury-gray leading-relaxed font-light">
-                {BEFORE_AFTER_IMAGE.subtitle}
-              </p>
-              
-              {/* Grading benefits list */}
-              <div className="space-y-3.5 pt-4">
-                <div className="flex items-center space-x-3 text-xs text-[#ccc] font-light">
-                  <CheckCircle2 className="w-4 h-4 text-luxury-gold shrink-0" />
-                  <span>Individual manual desaturation balancing</span>
-                </div>
-                <div className="flex items-center space-x-3 text-xs text-[#ccc] font-light">
-                  <CheckCircle2 className="w-4 h-4 text-luxury-gold shrink-0" />
-                  <span>Custom calibrated Hollywood LUT channels</span>
-                </div>
-                <div className="flex items-center space-x-3 text-xs text-[#ccc] font-light">
-                  <CheckCircle2 className="w-4 h-4 text-luxury-gold shrink-0" />
-                  <span>8K noise mapping & medium format clarity settings</span>
-                </div>
-              </div>
-
-              {/* Video prompt btn */}
-              <div className="pt-6">
-                <button
-                  onClick={() => setVideoOpen(true)}
-                  className="flex items-center space-x-3 px-6 py-4 bg-deep-teal/20 hover:bg-[#B7BE43] text-luxury-cream hover:text-luxury-black border border-white/10 hover:border-[#B7BE43] rounded-full text-xs font-display font-bold uppercase tracking-widest transition-all duration-300 shadow-md cursor-pointer"
-                  id="portfolio-play-reel-btn"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Inquire Video Grading Reel</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Slider Drag Frame Right */}
-            <div className="lg:col-span-12 xl:col-span-7">
-              <div 
-                className="relative h-[380px] md:h-[450px] w-full select-none overflow-hidden rounded-[28px] border border-white/5 cursor-ew-resize shadow-2xl"
-                onMouseMove={handleMouseMove}
-                onTouchMove={handleTouchMove}
-                onMouseDown={() => setIsSliding(true)}
-                onMouseUp={() => setIsSliding(false)}
-                onMouseLeave={() => setIsSliding(false)}
-              >
-                {/* AFTER IMAGE (vibrant colored right) */}
-                <img
-                  src={BEFORE_AFTER_IMAGE.after}
-                  alt="Color graded rendering"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                
-                {/* LABELS ONLY */}
-                <span className="absolute bottom-6 right-6 px-3.5 py-1.5 bg-[#0C0F0A]/90 rounded-full text-[8px] font-mono uppercase text-luxury-cream tracking-widest border border-white/10 z-20">
-                  DEVELOPED MASTER
-                </span>
-
-                {/* BEFORE IMAGE (desaturated RAW left) */}
-                <div 
-                  className="absolute inset-y-0 left-0 overflow-hidden"
-                  style={{ width: `${sliderPosition}%` }}
-                >
-                  <img
-                    src={BEFORE_AFTER_IMAGE.before}
-                    alt="Raw negative camera profile"
-                    className="absolute inset-y-0 left-0 h-full w-full object-cover grayscale brightness-65 contrast-90"
-                    style={{ width: "100%", maxWidth: "none" }}
-                    referrerPolicy="no-referrer"
-                  />
-                  
-                  <span className="absolute bottom-6 left-6 px-3.5 py-1.5 bg-[#0C0F0A]/90 rounded-full text-[8px] font-mono uppercase text-luxury-gray tracking-widest border border-white/10 z-20 whitespace-nowrap">
-                    RAW LOG CAMERA ARCHIVE
-                  </span>
-                </div>
-
-                {/* Draggable vertical divider track */}
-                <div 
-                  className="absolute top-0 bottom-0 z-20 w-[2px] bg-[#B7BE43] pointer-events-none"
-                  style={{ left: `${sliderPosition}%` }}
-                >
-                  {/* Slider head button item */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-[#B7BE43] border border-white flex items-center justify-center pointer-events-auto shadow-xl">
-                    <span className="text-[12px] text-luxury-black font-extrabold select-none">↔</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        {/* Remove comparison slider */}
 
       </div>
 

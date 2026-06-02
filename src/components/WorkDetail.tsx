@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { WORK_ITEMS } from "../data";
 import { audioService } from "../utils/audio";
-import { ArrowLeft, Camera, Compass, CheckCircle2, Sparkles, SlidersHorizontal, Play, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Camera, Compass, CheckCircle2, Sparkles, Play, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface WorkDetailProps {
   workId: string;
@@ -12,10 +12,6 @@ interface WorkDetailProps {
 
 export default function WorkDetail({ workId, onBack, onNavigateToContact }: WorkDetailProps) {
   const work = WORK_ITEMS.find((w) => w.id === workId);
-
-  // Before/after state config
-  const [sliderPosition, setSliderPosition] = useState<number>(50);
-  const [isSliding, setIsSliding] = useState<boolean>(false);
 
   // Immersive Lightbox state
   const [activeImgIndex, setActiveImgIndex] = useState<number | null>(null);
@@ -94,25 +90,6 @@ export default function WorkDetail({ workId, onBack, onNavigateToContact }: Work
     setActiveImgIndex((activeImgIndex - 1 + work.galleryImages.length) % work.galleryImages.length);
   };
 
-  // Slider navigation move tracking
-  const handleMove = (clientX: number, containerRect: DOMRect) => {
-    const x = clientX - containerRect.left;
-    const progress = Math.max(0, Math.min(100, (x / containerRect.width) * 100));
-    setSliderPosition(progress);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    handleMove(e.touches[0].clientX, rect);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.buttons === 1 || isSliding) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      handleMove(e.clientX, rect);
-    }
-  };
-
   return (
     <div className="relative min-h-screen bg-luxury-black pb-28 md:pb-36 overflow-hidden">
       {/* Decorative colored visual blobs */}
@@ -186,65 +163,6 @@ export default function WorkDetail({ workId, onBack, onNavigateToContact }: Work
               <p className="text-xs sm:text-sm text-luxury-gray font-light leading-relaxed">
                 This project was orchestrated to push the boundaries of high-contrast contour strobe setups, utilizing state-of-the-art digital plates as well as hand-processed analog sheets to capture texture in micro-dimensions. Every framing, exposure setting, and physical composition was calibrated dynamically to support deep luxury brand values.
               </p>
-            </div>
-
-            {/* In-view slider comparison specifically for this project */}
-            <div className="space-y-6">
-              <div className="flex items-center space-x-2.5">
-                <SlidersHorizontal className="w-4 h-4 text-[#B7BE43]" />
-                <span className="text-[10px] font-mono text-[#B7BE43] tracking-widest uppercase font-bold">
-                  COLOR SCIENCE RETOUCH LABORATORY
-                </span>
-              </div>
-
-              <div 
-                className="relative h-[300px] sm:h-[380px] w-full select-none overflow-hidden rounded-[28px] border border-white/5 cursor-ew-resize shadow-2xl"
-                onMouseMove={handleMouseMove}
-                onTouchMove={handleTouchMove}
-                onMouseDown={() => setIsSliding(true)}
-                onMouseUp={() => setIsSliding(false)}
-                onMouseLeave={() => setIsSliding(false)}
-              >
-                {/* AFTER IMAGE (Graded and vibrant) */}
-                <img
-                  src={afterImg}
-                  alt="Graded Masterplate View"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-
-                <span className="absolute bottom-6 right-6 px-3 py-1.5 bg-[#0C0F0A]/90 rounded-full text-[8px] font-mono uppercase text-luxury-cream tracking-widest border border-white/10 z-20">
-                  DEVELOPED MASTER
-                </span>
-
-                {/* BEFORE IMAGE (RAW neutral grey/unprocessed) */}
-                <div 
-                  className="absolute inset-y-0 left-0 overflow-hidden"
-                  style={{ width: `${sliderPosition}%` }}
-                >
-                  <img
-                    src={afterImg}
-                    alt="RAW negative profile View"
-                    className="absolute inset-y-0 left-0 h-full w-full object-cover grayscale brightness-65 contrast-85"
-                    style={{ width: "100%", maxWidth: "none" }}
-                    referrerPolicy="no-referrer"
-                  />
-
-                  <span className="absolute bottom-6 left-6 px-3 py-1.5 bg-[#0C0F0A]/90 rounded-full text-[8px] font-mono uppercase text-luxury-gray tracking-widest border border-white/10 z-20 whitespace-nowrap">
-                    RAW LOG CAMERA ARCHIVE
-                  </span>
-                </div>
-
-                {/* Vertical slider divider */}
-                <div 
-                  className="absolute top-0 bottom-0 z-20 w-[2px] bg-[#B7BE43] pointer-events-none"
-                  style={{ left: `${sliderPosition}%` }}
-                >
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-[#B7BE43] border border-white flex items-center justify-center pointer-events-auto shadow-xl">
-                    <span className="text-[12px] text-luxury-black font-extrabold select-none">↔</span>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Return Trigger area */}
