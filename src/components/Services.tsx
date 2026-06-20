@@ -1,19 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { SERVICES } from "../data";
-import { ArrowRight, Sparkles, Check, X } from "lucide-react";
+import { ArrowRight, Sparkles, Check, X, Loader2 } from "lucide-react";
 import { Service } from "../types";
+import { getCollectionData } from "../lib/db-client";
+
+let _servicesCache: Service[] | null = null;
 
 export default function Services() {
+  const [services, setServices] = useState<Service[]>(_servicesCache || []);
+  const [loading, setLoading] = useState(!_servicesCache);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const fetched = await getCollectionData<any>("services");
+        
+        // Sort by order locally
+        const sorted = fetched.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+
+        // Map Firestore 'number' to 'num' for UI compatibility
+        const mapped: Service[] = sorted.map(item => ({
+          ...item,
+          num: item.number || item.num
+        }));
+
+        const resultData = mapped;
+        setServices(resultData);
+      } catch (error) {
+        console.error("Error fetching services:", error);
+        setServices([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
   return (
-    <section id="services" className="relative py-24 md:py-36 bg-[#0E0E0E] overflow-hidden px-6 md:px-12">
+    <section id="services" className="relative py-24 md:py-36 bg-luxury-black overflow-hidden px-6 md:px-12">
       {/* Background ambient lighting glows only */}
       <div className="absolute top-[30%] left-[20%] w-[35rem] h-[35rem] bg-luxury-gold/5 rounded-full filter blur-3xl pointer-events-none" />
       <div className="absolute bottom-[20%] right-[10%] w-[35rem] h-[35rem] bg-luxury-gold/3 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 md:mb-24 gap-6">
@@ -31,56 +62,86 @@ export default function Services() {
         </div>
 
         {/* Services Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {SERVICES.map((service, index) => (
-            <motion.div
-              key={service.id}
-              className="glass-panel glass-panel-hover p-8 rounded-[32px] flex flex-col justify-between h-[360px] cursor-pointer group relative overflow-hidden"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              onClick={() => setSelectedService(service)}
-            >
-              {/* Subtle Gold Dust Glow behind card */}
-              <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-luxury-gold/3 group-hover:bg-luxury-gold/10 rounded-full filter blur-2xl transition-all duration-500" />
-              
-              {/* Card Header: Num and Sparkle */}
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-xs text-luxury-gold tracking-widest pl-1">
-                  NO. {service.num}
-                </span>
-                <span className="p-2 bg-white/5 rounded-full text-[#444] group-hover:text-luxury-gold group-hover:bg-luxury-gold/10 transition-all duration-400">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </span>
-              </div>
-
-              {/* Service Title & Info */}
-              <div className="space-y-3 mt-10">
-                <h3 className="font-display text-2xl font-bold text-luxury-cream group-hover:text-luxury-gold transition-colors duration-300 uppercase">
-                  {service.title}
-                </h3>
-                <p className="text-xs text-luxury-gray leading-relaxed font-light line-clamp-3">
-                  {service.description}
-                </p>
-              </div>
-
-              {/* Card Footer: Tags & Arrow */}
-              <div className="flex justify-between items-center pt-6 border-t border-white/5 mt-auto">
-                <div className="flex flex-wrap gap-2 max-w-[80%]">
-                  {service.tags.slice(0, 2).map((tag, tIdx) => (
-                    <span key={tIdx} className="text-[9px] font-mono tracking-wider space-x-1.5 uppercase text-zinc-500 bg-[#141414] px-2.5 py-1 rounded-full">
-                      {tag}
-                    </span>
-                  ))}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, idx) => (
+              <div 
+                key={`skeleton-${idx}`} 
+                className="glass-panel p-8 rounded-[32px] flex flex-col justify-between h-[360px] relative overflow-hidden animate-pulse border border-white/5"
+              >
+                <div className="absolute inset-0 bg-white/[0.02]" />
+                <div className="flex justify-between items-center relative z-10 w-full mb-10">
+                  <div className="w-16 h-4 bg-white/10 rounded" />
+                  <div className="w-8 h-8 rounded-full bg-white/10" />
                 </div>
-                <span className="p-2 rounded-full bg-white/5 text-luxury-cream group-hover:bg-[#fff] group-hover:text-black transition-all duration-400">
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </span>
+                <div className="space-y-4 relative z-10 w-full">
+                  <div className="w-3/4 h-8 bg-white/10 rounded-sm" />
+                  <div className="w-full h-3 bg-white/5 rounded-sm" />
+                  <div className="w-5/6 h-3 bg-white/5 rounded-sm" />
+                </div>
+                <div className="mt-auto flex justify-between items-end relative z-10 w-full">
+                  <div className="w-20 h-4 bg-white/10 rounded" />
+                  <div className="w-6 h-6 bg-white/10 rounded-full" />
+                </div>
               </div>
-            </motion.div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : services.length === 0 ? (
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-20 text-luxury-cream/40 font-mono text-xs uppercase tracking-[0.2em] leading-relaxed">
+            No architectural disciplines found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {services.map((service, index) => (
+              <motion.div
+                key={service.id}
+                className="glass-panel glass-panel-hover p-8 rounded-[32px] flex flex-col justify-between h-[360px] cursor-pointer group relative overflow-hidden"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                onClick={() => setSelectedService(service)}
+              >
+                {/* Subtle Gold Dust Glow behind card */}
+                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-luxury-gold/3 group-hover:bg-luxury-gold/10 rounded-full filter blur-2xl transition-all duration-500" />
+                
+                {/* Card Header: Num and Sparkle */}
+                <div className="flex justify-between items-center">
+                  <span className="font-mono text-xs text-luxury-gold tracking-widest pl-1">
+                    NO. {service.num}
+                  </span>
+                  <span className="p-2 bg-white/5 rounded-full text-zinc-600 group-hover:text-luxury-gold group-hover:bg-luxury-gold/10 transition-all duration-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+
+                {/* Service Title & Info */}
+                <div className="space-y-3 mt-10">
+                  <h3 className="font-display text-2xl font-bold text-luxury-cream group-hover:text-luxury-gold transition-colors duration-300 uppercase">
+                    {service.title}
+                  </h3>
+                  <p className="text-xs text-luxury-gray leading-relaxed font-light line-clamp-3">
+                    {service.description}
+                  </p>
+                </div>
+
+                {/* Card Footer: Tags & Arrow */}
+                <div className="flex justify-between items-center pt-6 border-t border-white/5 mt-auto">
+                  <div className="flex flex-wrap gap-2 max-w-[80%]">
+                    {service.tags.slice(0, 2).map((tag, tIdx) => (
+                      <span key={tIdx} className="text-[9px] font-mono tracking-wider space-x-1.5 uppercase text-zinc-500 bg-luxury-charcoal px-2.5 py-1 rounded-full">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="p-2 rounded-full bg-white/5 text-luxury-cream group-hover:bg-white group-hover:text-black transition-all duration-400">
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Floating CTA inquiry prompt below services */}
         <div className="mt-16 text-center">
@@ -129,7 +190,7 @@ export default function Services() {
                   Service Spec No. {selectedService.num}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold" />
-                <span className="text-xs font-mono text-[#555] uppercase">Certified Legacy</span>
+                <span className="text-xs font-mono text-zinc-500 uppercase">Certified Legacy</span>
               </div>
 
               <h3 className="font-display text-3xl md:text-4xl font-extrabold text-luxury-cream uppercase tracking-wide border-b border-white/5 pb-4">
@@ -161,7 +222,7 @@ export default function Services() {
                     setSelectedService(null);
                     window.location.hash = "#contact";
                   }}
-                  className="px-6 py-3 bg-luxury-gold text-luxury-black font-display font-medium text-[11px] tracking-widest uppercase rounded-full hover:bg-white hover:text-black transition-colors"
+                  className="bg-[#2a2c16] hover:bg-[#34371b] text-[#b6b335] font-mono font-bold text-[10px] sm:text-[11px] tracking-[0.15em] uppercase px-8 py-3.5 rounded-full transition-colors cursor-pointer"
                   id="modal-services-inquire-btn"
                 >
                   Book Service Campaign

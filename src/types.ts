@@ -3,14 +3,25 @@ export interface WorkItem {
   title: string;
   category: "Fashion" | "Wedding" | "Lifestyle" | "Commercial";
   image: string;
+  imageAlt?: string;
   description: string;
   year: string;
   client: string;
   role: string;
-  beforeImage?: string;
-  afterImage?: string;
   details: string[];
   galleryImages?: string[];
+  seo?: SEOSettings;
+  aboutShootTitle?: string;
+  behindTheScenesLink?: string;
+  ctaSubtitle?: string;
+  ctaTitle?: string;
+  ctaDesc?: string;
+  ctaButtonText?: string;
+  location?: string;
+  gear?: string;
+  projectStatus?: string;
+  photographerName?: string;
+  order?: number;
 }
 
 export interface Service {
@@ -20,6 +31,10 @@ export interface Service {
   description: string;
   longDesc: string;
   tags: string[];
+  order?: number;
+  createdAt?: any;
+  updatedAt?: any;
+  updatedBy?: string;
 }
 
 export interface Review {
@@ -30,6 +45,10 @@ export interface Review {
   comment: string;
   avatar: string;
   rating: number;
+  order?: number;
+  createdAt?: any;
+  updatedAt?: any;
+  updatedBy?: string;
 }
 
 export interface TeamMember {
@@ -48,6 +67,14 @@ export interface ProcessStep {
   description: string;
 }
 
+export interface PlanVariant {
+  id: string;
+  name: string;
+  price: string;
+  duration: string;
+  description: string;
+}
+
 export interface PricingTier {
   id: string;
   name: string;
@@ -56,6 +83,14 @@ export interface PricingTier {
   features: string[];
   highlight: boolean;
   tags: string[];
+  duration?: string;
+  stylePreset?: "p1" | "p2" | "p3";
+  order?: number;
+  active?: boolean;
+  variants?: PlanVariant[];
+  createdAt?: any;
+  updatedAt?: any;
+  updatedBy?: string;
 }
 
 export interface FaqItem {
@@ -70,6 +105,7 @@ export interface BlogPost {
   summary: string;
   content: string[]; // split by paragraphs for easy typographic rendering
   coverImage: string;
+  coverImageAlt?: string;
   readTime: string;
   date: string;
   category: string;
@@ -79,4 +115,47 @@ export interface BlogPost {
     avatar: string;
     role: string;
   };
+  seo?: SEOSettings;
+}
+
+export interface SEOSettings {
+  title?: string;
+  description?: string;
+  focusKeyword?: string;
+  canonicalUrl?: string;
+  slug?: string;
+
+  // Social sharing
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
+
+  // Advanced SEO
+  noindex?: boolean;
+  nofollow?: boolean;
+  schemaType?: string;
+  schemaJson?: string;
+}
+
+export interface GlobalSEOSettings {
+  defaultTitle: string;
+  titleTemplate: string;
+  defaultDescription: string;
+  defaultOgImage: string;
+  siteName: string;
+  twitterHandle: string;
+}
+
+export interface StudioSettings {
+  city: string;
+  address: string;
+  phone: string;
+  hours: string;
+  lat: number;
+  lng: number;
+  updatedAt?: any;
+  updatedBy?: string;
 }

@@ -1,17 +1,76 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { FAQS } from "../data";
 import { Plus, Minus, HelpCircle, ArrowRight } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { FaqItem } from "../types";
 
-export default function FAQ() {
+interface FAQProps {
+  pageId?: string;
+}
+
+export default function FAQ({ pageId = "home" }: FAQProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [faqs, setFaqs] = useState<FaqItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadFaqs() {
+      try {
+        const docRef = doc(db, "faq_pages", pageId);
+        const snapshot = await getDoc(docRef);
+        if (snapshot.exists() && snapshot.data().faqs?.length) {
+          setFaqs(snapshot.data().faqs);
+        } else if (pageId !== "home") {
+          // fallback to home page if no specific FAQs text for this page
+          const fallbackSnap = await getDoc(doc(db, "faq_pages", "home"));
+          if (fallbackSnap.exists() && fallbackSnap.data().faqs?.length) {
+            setFaqs(fallbackSnap.data().faqs);
+          } else {
+            setFaqs(FAQS); // local fallback
+          }
+        } else {
+          setFaqs(FAQS); // local fallback
+        }
+      } catch (err) {
+        setFaqs(FAQS);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadFaqs();
+  }, [pageId]);
 
   const toggleFaq = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
   };
 
+  if (loading) return <div className="py-24 flex justify-center"><div className="w-6 h-6 border-2 border-luxury-gold border-t-transparent rounded-full animate-spin" /></div>;
+
+  if (faqs.length === 0) return null;
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map((faq) => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer,
+      },
+    })),
+  };
+
   return (
     <section id="faq" className="relative py-24 md:py-36 bg-[#0E0E0E] overflow-hidden px-6 md:px-12 border-t border-white/5">
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(faqSchema)}
+        </script>
+      </Helmet>
       {/* Background radial lighting */}
       <div className="absolute bottom-[10%] left-[8%] w-[25rem] h-[25rem] bg-luxury-gold/3 rounded-full filter blur-3xl pointer-events-none" />
 
@@ -33,7 +92,7 @@ export default function FAQ() {
 
         {/* Minimal Accordion List */}
         <div className="space-y-4">
-          {FAQS.map((faq, index) => {
+          {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
 
             return (

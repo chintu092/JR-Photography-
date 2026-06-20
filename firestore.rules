@@ -1,0 +1,404 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny with Super Admin bypass to prevent recursive rule failures during complex admin operations
+    match /{document=**} {
+      allow read, write: if isSuper();
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isSuper() {
+      return isSignedIn() && 
+             'email' in request.auth.token && 
+             request.auth.token.email != null && 
+             (request.auth.token.email.lower() == 'supriyos9@gmail.com' || request.auth.token.email == 'supriyos9@gmail.com');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuper() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        ('email' in request.auth.token && request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validations
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll(['logoUrl', 'updatedAt', 'updatedBy']) &&
+             data.logoUrl is string && data.logoUrl.size() <= 2048 &&
+             (!('whatsappEnabled' in data) || data.whatsappEnabled is bool) &&
+             (!('whatsappNumber' in data) || data.whatsappNumber is string) &&
+             (!('whatsappMessage' in data) || data.whatsappMessage is string) &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidSEOSettings(data) {
+      return data.keys().hasAll(['siteName', 'defaultTitle', 'titleTemplate', 'defaultDescription', 'canonicalUrl', 'defaultOgImage', 'updatedAt', 'updatedBy']) &&
+             data.keys().hasOnly(['siteName', 'defaultTitle', 'titleTemplate', 'defaultDescription', 'canonicalUrl', 'defaultOgImage', 'twitterHandle', 'updatedAt', 'updatedBy']) &&
+             data.siteName is string &&
+             data.defaultTitle is string &&
+             data.titleTemplate is string &&
+             data.defaultDescription is string &&
+             data.canonicalUrl is string &&
+             data.defaultOgImage is string &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidPageSEOSettings(data) {
+      return data.keys().hasAll(['updatedAt', 'updatedBy']) &&
+             (!('title' in data) || data.title is string) &&
+             (!('description' in data) || data.description is string) &&
+             (!('focusKeyword' in data) || data.focusKeyword is string) &&
+             (!('canonicalUrl' in data) || data.canonicalUrl is string) &&
+             (!('ogImageUrl' in data) || data.ogImageUrl is string) &&
+             (!('noIndex' in data) || data.noIndex is bool) &&
+             (!('slug' in data) || data.slug is string) &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidThemeSettings(data) {
+      return data.keys().hasAll(['gold', 'black', 'cream', 'gray', 'updatedAt', 'updatedBy']) &&
+             data.keys().size() == 6 &&
+             data.gold.matches('^#[0-9a-fA-F]{6}$') &&
+             data.black.matches('^#[0-9a-fA-F]{6}$') &&
+             data.cream.matches('^#[0-9a-fA-F]{6}$') &&
+             data.gray.matches('^#[0-9a-fA-F]{6}$') &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidPortfolioItem(data) {
+      return data.keys().hasAll(['title', 'category', 'image', 'description', 'year', 'client', 'role', 'createdAt', 'updatedAt', 'updatedBy']) &&
+             data.title is string &&
+             data.category is string &&
+             data.image is string &&
+             data.description is string &&
+             data.year is string &&
+             data.client is string &&
+             data.role is string &&
+             ( !('beforeImage' in data) || data.beforeImage is string ) &&
+             ( !('afterImage' in data) || data.afterImage is string ) &&
+             ( !('details' in data) || data.details is list ) &&
+             ( !('galleryImages' in data) || data.galleryImages is list ) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['email', 'name', 'role', 'permissions']) &&
+             data.email is string && data.email.size() <= 256 &&
+             data.name is string &&
+             data.role in ['super_admin', 'sub_admin'] &&
+             data.permissions is list;
+    }
+
+    function isValidBlogPost(data) {
+      return data.keys().hasAll(['title', 'summary', 'content', 'coverImage', 'readTime', 'date', 'category', 'author', 'createdAt', 'updatedAt', 'updatedBy']) &&
+             data.title is string &&
+             data.summary is string &&
+             data.content is list &&
+             data.coverImage is string &&
+             data.readTime is string &&
+             data.date is string &&
+             data.category is string &&
+             data.author is map &&
+             data.author.keys().hasAll(['name', 'avatar', 'role']) &&
+             ( !('quote' in data) || data.quote is string ) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidTestimonial(data) {
+      return data.keys().hasAll(['name', 'role', 'company', 'comment', 'avatar', 'rating', 'createdAt', 'updatedAt', 'updatedBy']) &&
+             data.keys().size() == 9 &&
+             data.name is string &&
+             data.role is string &&
+             data.company is string &&
+             data.comment is string &&
+             data.avatar is string &&
+             data.rating is number &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['num', 'title', 'description', 'longDesc', 'tags', 'order', 'createdAt', 'updatedAt', 'updatedBy']) &&
+             data.keys().size() == 9 &&
+             data.num is string &&
+             data.title is string &&
+             data.description is string &&
+             data.longDesc is string &&
+             data.tags is list &&
+             data.order is number &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidStudioSettings(data) {
+      return data.keys().hasAll(['city', 'address', 'phone', 'hours', 'lat', 'lng', 'updatedAt', 'updatedBy']) &&
+             data.keys().size() == 8 &&
+             data.city is string &&
+             data.address is string &&
+             data.phone is string &&
+             data.hours is string &&
+             data.lat is number &&
+             data.lng is number &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    function isValidCommunitySettings(data) {
+      return data.keys().hasAll(['titleHeader', 'subtitleHeader', 'body', 'joinLink', 'backgroundImage', 'imageURL', 'features', 'updatedAt', 'updatedBy']);
+    }
+
+    function isValidFaqPage(data) {
+      return data.keys().hasAll(['title', 'faqs']) &&
+             data.title is string &&
+             data.faqs is list;
+    }
+
+    function isValidContactSubmission(data) {
+      return data.keys().hasAll(['name', 'email', 'message', 'status', 'createdAt']) &&
+             data.keys().hasOnly(['name', 'email', 'subject', 'message', 'status', 'createdAt']) &&
+             data.name is string && data.name.size() <= 256 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.message is string && data.message.size() <= 10000 &&
+             data.status in ['New', 'Replied', 'Pending'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidAnalyticsSettings(data) {
+      return data.keys().hasAll(['pageViews', 'uniqueVisitors', 'trafficData', 'sources', 'updatedAt']) &&
+             data.keys().size() == 5 &&
+             data.pageViews is number &&
+             data.uniqueVisitors is number &&
+             data.trafficData is list &&
+             data.sources is list &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidHeroSettings(data) {
+      return data.keys().hasAll(['titleLine1', 'titleLine2', 'badgeText', 'description', 'btn1Text', 'btn1Link', 'btn2Text', 'btn2Link', 'backdropSlides', 'column1Cards', 'column2Cards', 'updatedAt', 'updatedBy']) &&
+             data.titleLine1 is string &&
+             data.titleLine2 is string &&
+             data.badgeText is string &&
+             data.description is string &&
+             data.btn1Text is string &&
+             data.btn1Link is string &&
+             data.btn2Text is string &&
+             data.btn2Link is string &&
+             data.backdropSlides is list &&
+             data.column1Cards is list &&
+             data.column2Cards is list &&
+             data.updatedAt is timestamp &&
+             data.updatedBy == request.auth.uid;
+    }
+
+    // Rules for Settings Collection (Wildcard for listing / exporting)
+    match /settings/{settingId} {
+      allow list: if isAdmin();
+      allow read: if isAdmin() || (settingId in ['general', 'seo', 'theme', 'hero', 'studio', 'community', 'navigation', 'analytics', 'smtp']);
+      allow write: if isAdmin();
+    }
+
+    // Rules for Site Settings
+    match /settings/general {
+      allow read: if true; // Publicly readable
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/seo {
+      allow read: if true; // Publicly readable
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+
+      match /pages/{pageId} {
+        allow read: if true;
+        allow create, update: if isAdmin() && isValidId(pageId);
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /settings/theme {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/hero {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/studio {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/community {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/navigation {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/smtp {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /faq_pages/{pageId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(pageId);
+      allow delete: if isAdmin() && isValidId(pageId);
+    }
+
+    // Rules for Admins collection
+    match /admins/{adminId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isSuper() || (isSignedIn() && (request.auth.uid == adminId || (resource == null && request.resource.data.addedBy in ['self_registration_credentials', 'self_registration_google'])));
+    }
+
+    // Rules for Portfolio
+    match /portfolio/{itemId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    // Rules for Blog
+    match /blog/{postId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    // Rules for Testimonials
+    match /testimonials/{testimonialId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    // Rules for Services
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Rules for Pricing Plans
+    match /pricing_plans/{planId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Rules for Contacts
+    match /contacts/{contactId} {
+      allow create: if isValidContactSubmission(incoming()) && isValidId(contactId);
+      allow list: if isAdmin();
+      allow get, update, delete: if isAdmin() && isValidId(contactId);
+    }
+
+    // Rules for Analytics Settings
+    match /settings/analytics {
+      allow read: if true;
+      allow create: if (
+        (isAdmin() && isValidAnalyticsSettings(incoming())) ||
+        (
+          incoming().keys().hasAll(['pageViews', 'updatedAt']) &&
+          incoming().pageViews is number &&
+          incoming().updatedAt is timestamp &&
+          ( !('uniqueVisitors' in incoming()) || incoming().uniqueVisitors is number )
+        )
+      );
+      allow update: if (
+        isAdmin() ||
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['pageViews', 'updatedAt']) &&
+          incoming().pageViews is number && incoming().updatedAt is timestamp
+        ) ||
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['uniqueVisitors', 'updatedAt']) &&
+          incoming().uniqueVisitors is number && incoming().updatedAt is timestamp
+        ) ||
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['pageViews', 'uniqueVisitors', 'updatedAt']) &&
+          incoming().pageViews is number && incoming().uniqueVisitors is number && incoming().updatedAt is timestamp
+        )
+      );
+    }
+
+    // Rules for Subscribers
+    match /subscribers/{subscriberId} {
+      allow create: if incoming().keys().hasAll(['email', 'subscribedAt']) &&
+                       incoming().email is string &&
+                       incoming().email.matches('^[^\\\\s@]+@[^\\\\s@]+\\\\.[^\\\\s@]+$') &&
+                       incoming().subscribedAt is timestamp;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Rules for WhatsApp Clicks Analytics
+    match /whatsapp_clicks/{clickId} {
+      allow create: if incoming().keys().hasAll(['clickedAt']) && 
+                       incoming().clickedAt is timestamp;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Rules for Activity Logs
+    match /activity_logs/{logId} {
+      allow list, read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Rules for Wayfic Managed Forms
+    match /wayfic_forms/{formId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Rules for Wayfic Submissions
+    match /wayfic_submissions/{submissionId} {
+      allow create: if incoming().keys().hasAll(['formId', 'data', 'createdAt']) &&
+                       incoming().formId is string &&
+                       incoming().createdAt is timestamp;
+      allow read, write: if isAdmin();
+    }
+  }
+}

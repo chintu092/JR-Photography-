@@ -18,12 +18,12 @@ export default function Process() {
   const step05 = PROCESS_STEPS[4];
 
   return (
-    <section id="process" className="relative py-24 md:py-36 bg-[#0E0E0E] overflow-hidden px-6 md:px-12 border-t border-white/5 transition-all duration-300">
+    <section id="process" className="relative py-24 md:py-36 bg-luxury-black overflow-hidden px-6 md:px-12 border-t border-white/5 transition-all duration-300">
       {/* Background ambient circular halos */}
       <div className="absolute top-[15%] left-[5%] w-[30rem] h-[30rem] bg-luxury-gold/5 rounded-full filter blur-3xl pointer-events-none" />
       <div className="absolute bottom-[10%] right-[5%] w-[25rem] h-[25rem] bg-deep-teal/5 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto">
+      <div className="max-w-7xl mx-auto">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 md:mb-24 gap-6">
@@ -67,7 +67,7 @@ export default function Process() {
               </p>
             </div>
 
-            <div className="flex items-center space-x-2 pt-2 border-t border-white/5 text-[9px] font-mono tracking-widest text-[#B7BE43] uppercase">
+            <div className="flex items-center space-x-2 pt-2 border-t border-white/5 text-[9px] font-mono tracking-widest text-luxury-gold uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold animate-pulse" />
               <span>DURATION: {step01.duration}</span>
             </div>
@@ -127,7 +127,7 @@ export default function Process() {
                 <span className="text-[10px] font-mono text-luxury-gold tracking-widest uppercase">
                   PHASE {step03.num}
                 </span>
-                <span className="px-3.5 py-1.5 bg-[#B7BE43]/15 text-[#B7BE43] border border-[#B7BE43]/20 rounded-full text-[8.5px] font-mono tracking-widest uppercase animate-pulse">
+                <span className="px-3.5 py-1.5 bg-luxury-gold/15 text-luxury-gold border border-luxury-gold/20 rounded-full text-[8.5px] font-mono tracking-widest uppercase animate-pulse">
                   ON PRODUCTION
                 </span>
               </div>
@@ -213,7 +213,7 @@ export default function Process() {
 
           {/* Card 5: Phase 05 (Noise AI style - Spanning 2 columns horizontally, image overlapping) */}
           <motion.div 
-            className="lg:col-span-2 bg-[#121611]/60 p-8 rounded-[32px] min-h-[300px] border border-white/5 flex flex-col sm:flex-row items-stretch justify-between overflow-hidden relative gap-6 transition-all duration-300 hover:border-[#B7BE43]/20 group"
+            className="lg:col-span-2 bg-luxury-charcoal/60 p-8 rounded-[32px] min-h-[300px] border border-white/5 flex flex-col sm:flex-row items-stretch justify-between overflow-hidden relative gap-6 transition-all duration-300 hover:border-luxury-gold/20 group"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -238,7 +238,7 @@ export default function Process() {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2 pt-4 border-t border-white/5 text-[9px] font-mono tracking-widest text-[#B7BE43] uppercase mt-4">
+              <div className="flex items-center space-x-2 pt-4 border-t border-white/5 text-[9px] font-mono tracking-widest text-luxury-gold uppercase mt-4">
                 <BookOpen className="w-3.5 h-3.5 text-luxury-gold" />
                 <span>LINEN ART VOLUMES</span>
               </div>
@@ -252,7 +252,7 @@ export default function Process() {
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#121611] to-transparent pointer-events-none hidden sm:block" />
+              <div className="absolute inset-0 bg-gradient-to-r from-luxury-black to-transparent pointer-events-none hidden sm:block" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
               <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/10 text-[8px] font-mono uppercase text-luxury-cream z-20 tracking-wider">
                 CERTIFIED ORIGINAL
@@ -287,7 +287,7 @@ export default function Process() {
               </p>
             </div>
 
-            <div className="flex items-center justify-center space-x-1.5 pt-2 border-t border-white/5 text-[9px] font-mono tracking-widest text-[#B7BE43] uppercase">
+            <div className="flex items-center justify-center space-x-1.5 pt-2 border-t border-white/5 text-[9px] font-mono tracking-widest text-luxury-gold uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold" />
               <span>CERTIFICATION APPROVED</span>
             </div>

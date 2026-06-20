@@ -1,8 +1,14 @@
-import React, { useEffect } from "react";
-import { motion } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { motion, useScroll, useSpring } from "motion/react";
 import { BLOG_POSTS } from "../data";
+import { BlogPost } from "../types";
 import { audioService } from "../utils/audio";
-import { ArrowLeft, Calendar, Clock, Quote, Sparkles, User, Share2 } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Quote, Sparkles, User, Share2, Loader2 } from "lucide-react";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import LazyImage from "./LazyImage";
+import { Helmet } from "react-helmet-async";
+import WayficFormRenderer from "./WayficFormRenderer";
 
 interface BlogDetailProps {
   blogId: string;
@@ -10,12 +16,48 @@ interface BlogDetailProps {
 }
 
 export default function BlogDetail({ blogId, onBack }: BlogDetailProps) {
-  const post = BLOG_POSTS.find((b) => b.id === blogId);
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
+  useEffect(() => {
+    async function fetchPost() {
+      try {
+        const docRef = doc(db, "blog", blogId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setPost({ id: snap.id, ...snap.data() } as BlogPost);
+        } else {
+          setPost(null);
+        }
+      } catch (err) {
+        console.error("Error fetching blog post:", err);
+        setPost(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPost();
+  }, [blogId]);
 
   useEffect(() => {
     // Scroll to top immediately when viewing a detail article page
     window.scrollTo({ top: 0, behavior: "instant" as any });
   }, [blogId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-luxury-black flex items-center justify-center p-12">
+        <Loader2 className="w-8 h-8 animate-spin text-luxury-gold" />
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -35,6 +77,27 @@ export default function BlogDetail({ blogId, onBack }: BlogDetailProps) {
 
   return (
     <div className="relative min-h-screen bg-luxury-black pb-28 md:pb-36 overflow-hidden">
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": post.title,
+            "image": [
+              post.coverImage
+            ],
+            "datePublished": post.date,
+            "author": [{
+                "@type": "Person",
+                "name": post.author.name
+            }]
+          })}
+        </script>
+      </Helmet>
+      <motion.div
+        style={{ scaleX }}
+        className="fixed top-0 left-0 right-0 h-[2px] sm:h-1 bg-luxury-gold origin-left z-[100] rounded-r-full"
+      />
       {/* Absolute colored spotlights on background */}
       <div className="absolute top-1/4 left-[5%] w-[400px] h-[400px] bg-deep-teal/5 rounded-full filter blur-[100px] pointer-events-none" />
       <div className="absolute bottom-1/3 right-[10%] w-[350px] h-[350px] bg-dark-olive/6 rounded-full filter blur-[120px] pointer-events-none" />
@@ -43,11 +106,11 @@ export default function BlogDetail({ blogId, onBack }: BlogDetailProps) {
       <div className="relative w-full h-[60vh] min-h-[400px] md:min-h-[550px] overflow-hidden">
         {/* Full Image */}
         <div className="absolute inset-0">
-          <img
+          <LazyImage
             src={post.coverImage}
-            alt={post.title}
+            alt={post.coverImageAlt || post.title}
             className="w-full h-full object-cover grayscale brightness-50"
-            referrerPolicy="no-referrer"
+            containerClassName="w-full h-full"
           />
           {/* Gradients */}
           <div className="absolute inset-0 bg-gradient-to-t from-luxury-black via-luxury-black/30 to-transparent" />
@@ -129,12 +192,19 @@ export default function BlogDetail({ blogId, onBack }: BlogDetailProps) {
 
           {/* Paragraph rendering */}
           {post.content.map((pText, pIdx) => {
+            if (pText.includes("[wayfic-form")) {
+              return (
+                <div key={pIdx} className="my-8 max-w-xl mx-auto bg-luxury-black/60 p-6 sm:p-8 border border-white/5 rounded-3xl">
+                  <WayficFormRenderer shortcode={pText} />
+                </div>
+              );
+            }
             // First paragraph might have big dropcap as option
             return (
               <p
                 key={pIdx}
                 className={`text-sm sm:text-base text-[#eee] font-light leading-relaxed tracking-wide ${
-                  pIdx === 0 ? "first-letter:text-5xl first-letter:font-serif first-letter:font-bold first-letter:text-[#B7BE43] first-letter:float-left first-letter:mr-3 first-letter:mt-1" : ""
+                  pIdx === 0 ? "first-letter:text-5xl first-letter:font-serif first-letter:font-bold first-letter:text-[#B7BE43] first-letter:float-left first-letter:mr-3 first-letter:mt-1 font-light" : ""
                 }`}
               >
                 {pText}

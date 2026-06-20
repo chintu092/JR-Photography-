@@ -1,16 +1,41 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { BLOG_POSTS } from "../data";
 import { BlogPost } from "../types";
 import { audioService } from "../utils/audio";
-import { BookOpen, Calendar, Clock, Sparkles, ArrowRight, User } from "lucide-react";
+import { BookOpen, Calendar, Clock, Sparkles, ArrowRight, User, Loader2 } from "lucide-react";
+import { getCollectionData } from "../lib/db-client";
+import LazyImage from "./LazyImage";
+
+let _blogCache: BlogPost[] | null = null;
 
 interface BlogProps {
   onSelectBlog: (id: string) => void;
 }
 
 export default function Blog({ onSelectBlog }: BlogProps) {
+  const [posts, setPosts] = useState<BlogPost[]>(_blogCache || []);
+  const [loading, setLoading] = useState(!_blogCache);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        const items = await getCollectionData<BlogPost>("blog");
+        if (items && items.length > 0) {
+          const sorted = items.sort((a, b) => b.date.localeCompare(a.date));
+          setPosts(sorted);
+        } else {
+          setPosts([]);
+        }
+      } catch (err) {
+        setPosts([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPosts();
+  }, []);
 
   const handlePostClick = (id: string) => {
     audioService.playClick();
@@ -27,17 +52,17 @@ export default function Blog({ onSelectBlog }: BlogProps) {
       <div className="absolute top-1/3 right-[10%] w-[350px] h-[350px] bg-deep-teal/5 rounded-full filter blur-[110px] pointer-events-none" />
       <div className="absolute bottom-1/4 left-[8%] w-[400px] h-[400px] bg-dark-olive/4 rounded-full filter blur-[120px] pointer-events-none" />
 
-      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16 md:mb-24">
-          <div className="inline-flex items-center space-x-2 text-[9px] font-mono tracking-[0.43em] text-[#B7BE43] uppercase mb-4">
+          <div className="inline-flex items-center space-x-2 text-[9px] font-mono tracking-[0.43em] text-luxury-gold uppercase mb-4">
             <BookOpen className="w-4 h-4 animate-pulse" />
             <span>EDITORIAL PUBLICATION</span>
           </div>
           <h1 className="font-display font-medium text-4xl sm:text-6xl text-luxury-cream uppercase tracking-tight leading-none mb-6">
             THE CHRONICLE <br />
-            <span className="font-serif italic font-light text-[#B7BE43]">Refined Thought</span>
+            <span className="font-serif italic font-light text-luxury-gold">Refined Thought</span>
           </h1>
           <p className="text-xs sm:text-sm text-luxury-gray leading-relaxed font-light">
             An premium dispatch center detailing color science research and medium-format lens physics from our directors on location.
@@ -46,7 +71,44 @@ export default function Blog({ onSelectBlog }: BlogProps) {
 
         {/* Blog Post Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-          {BLOG_POSTS.map((post, idx) => {
+          {loading ? (
+            [...Array(6)].map((_, idx) => (
+              <div 
+                key={`skeleton-${idx}`} 
+                className="flex flex-col h-full bg-[#121611]/80 border border-white/5 rounded-[32px] overflow-hidden animate-pulse relative"
+              >
+                <div className="absolute inset-0 bg-white/[0.02]" />
+                <div className="h-64 w-full bg-white/5" />
+                <div className="p-8 flex-grow flex flex-col justify-between space-y-6 relative z-10 w-full">
+                  <div className="space-y-4">
+                    <div className="flex space-x-4">
+                      <div className="w-16 h-3 bg-white/10 rounded" />
+                      <div className="w-16 h-3 bg-white/10 rounded" />
+                    </div>
+                    <div className="w-3/4 h-8 bg-white/10 rounded" />
+                    <div className="space-y-2 mt-4">
+                      <div className="w-full h-3 bg-white/5 rounded" />
+                      <div className="w-5/6 h-3 bg-white/5 rounded" />
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-7 h-7 rounded-full bg-white/10" />
+                      <div className="space-y-1">
+                        <div className="w-20 h-2 bg-white/10 rounded" />
+                        <div className="w-12 h-2 bg-white/5 rounded" />
+                      </div>
+                    </div>
+                    <div className="w-4 h-4 bg-white/10 rounded" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : posts.length === 0 ? (
+            <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-24 text-luxury-cream/60 font-mono text-xs uppercase tracking-widest leading-relaxed">
+              No publications found.
+            </div>
+          ) : posts.map((post, idx) => {
             const isHovered = hoveredId === post.id;
             return (
               <motion.article
@@ -55,7 +117,7 @@ export default function Blog({ onSelectBlog }: BlogProps) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.8, delay: idx * 0.1 }}
-                className="group relative flex flex-col h-full bg-[#121611]/60 border border-white/5 rounded-[32px] overflow-hidden cursor-pointer hover:border-[#B7BE43]/20 shadow-2xl transition-colors duration-500"
+                className="group relative flex flex-col h-full bg-luxury-charcoal/60 border border-white/5 rounded-[32px] overflow-hidden cursor-pointer hover:border-luxury-gold/20 shadow-2xl transition-colors duration-500"
                 onClick={() => handlePostClick(post.id)}
                 onMouseEnter={() => {
                   setHoveredId(post.id);
@@ -66,14 +128,14 @@ export default function Blog({ onSelectBlog }: BlogProps) {
               >
                 {/* Image Cover */}
                 <div className="aspect-[16/10] overflow-hidden relative">
-                  <img
+                  <LazyImage
                     src={post.coverImage}
-                    alt={post.title}
+                    alt={post.coverImageAlt || post.title}
                     className="w-full h-full object-cover grayscale brightness-90 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-[1000ms] ease-out"
-                    referrerPolicy="no-referrer"
+                    containerClassName="w-full h-full"
                   />
                   {/* Category overlay label */}
-                  <span className="absolute top-6 left-6 px-3 py-1.5 bg-[#0C0F0A]/95 rounded-full text-[8px] font-mono tracking-widest text-[#B7BE43] uppercase border border-white/10">
+                  <span className="absolute top-6 left-6 px-3 py-1.5 bg-luxury-black/95 rounded-full text-[8px] font-mono tracking-widest text-luxury-gold uppercase border border-white/10">
                     {post.category}
                   </span>
                 </div>
@@ -84,7 +146,7 @@ export default function Blog({ onSelectBlog }: BlogProps) {
                     {/* Timestamp metadata */}
                     <div className="flex items-center space-x-4 text-[9px] font-mono text-luxury-gray tracking-wider">
                       <span className="flex items-center space-x-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#B7BE43] shrink-0" />
+                        <Calendar className="w-3.5 h-3.5 text-luxury-gold shrink-0" />
                         <span>{post.date}</span>
                       </span>
                       <span>•</span>
@@ -94,7 +156,7 @@ export default function Blog({ onSelectBlog }: BlogProps) {
                       </span>
                     </div>
 
-                    <h2 className="font-display font-medium text-xl sm:text-2xl text-luxury-cream group-hover:text-[#B7BE43] transition-colors duration-300 uppercase leading-snug">
+                    <h2 className="font-display font-medium text-xl sm:text-2xl text-luxury-cream group-hover:text-luxury-gold transition-colors duration-300 uppercase leading-snug">
                       {post.title}
                     </h2>
 
@@ -109,7 +171,7 @@ export default function Blog({ onSelectBlog }: BlogProps) {
                       <img
                         src={post.author.avatar}
                         alt={post.author.name}
-                        className="w-7 h-7 rounded-full object-cover border border-[#B7BE43]/50"
+                        className="w-7 h-7 rounded-full object-cover border border-luxury-gold/50"
                         referrerPolicy="no-referrer"
                       />
                       <div className="text-left leading-none">
@@ -123,7 +185,7 @@ export default function Blog({ onSelectBlog }: BlogProps) {
                     </div>
 
                     {/* Go indicator */}
-                    <div className="w-8 h-8 rounded-full bg-white/5 group-hover:bg-[#B7BE43] flex items-center justify-center transition-colors duration-300">
+                    <div className="w-8 h-8 rounded-full bg-white/5 group-hover:bg-luxury-gold flex items-center justify-center transition-colors duration-300">
                       <ArrowRight className="w-4 h-4 text-luxury-cream group-hover:text-luxury-black transition-colors" />
                     </div>
                   </div>

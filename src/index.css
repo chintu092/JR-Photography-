@@ -70,19 +70,61 @@
   }
 }
 
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  &::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--luxury-gold);
+    border-radius: 10px;
+  }
+}
+
+@utility pretty-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(132, 109, 247, 0.45) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(132, 109, 247, 0.35);
+    border-radius: 10px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(132, 109, 247, 0.65);
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0C0F0A;
+  background: var(--luxury-black);
 }
 ::-webkit-scrollbar-thumb {
-  background: #3E4A18;
+  background: var(--dark-olive);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #B7BE43;
+  background: var(--luxury-gold);
 }
 
 /* Grain Noise Overlay */
@@ -99,25 +141,25 @@
 
 /* Glassmorphism utility */
 .glass-panel {
-  background: rgba(30, 86, 98, 0.12); /* Deep Teal with opacity */
+  background: var(--deep-teal-12, rgba(30, 86, 98, 0.12));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(233, 233, 231, 0.08); /* Soft white border */
+  border: 1px solid var(--luxury-cream-08, rgba(233, 233, 231, 0.08));
 }
 
 .glass-panel-hover {
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .glass-panel-hover:hover {
-  background: rgba(30, 86, 98, 0.2);
-  border-color: rgba(183, 190, 67, 0.3); /* Lime Green glow border */
-  box-shadow: 0 10px 40px -10px rgba(183, 190, 67, 0.12);
+  background: var(--deep-teal-20, rgba(30, 86, 98, 0.2));
+  border-color: var(--luxury-gold-30, rgba(183, 190, 67, 0.3));
+  box-shadow: 0 10px 40px -10px var(--luxury-gold-12, rgba(183, 190, 67, 0.12));
 }
 
 /* Utilities for smooth scrolls and interactive features */
 html {
   scroll-behavior: smooth;
-  background-color: #0C0F0A;
+  background-color: var(--luxury-black);
 }
 
 /* Smooth zoom-in container */
@@ -138,18 +180,18 @@ body, main, section, footer, header, .glass-panel, .bg-luxury-black, .bg-luxury-
 
 /* Light Mode Overrides for Transparency & Solid Counterparts */
 [data-theme="light"] {
-  background-color: #E9E9E7;
-  color: #0C0F0A;
+  background-color: var(--luxury-black);
+  color: var(--luxury-cream);
 }
 [data-theme="light"] html {
-  background-color: #E9E9E7;
+  background-color: var(--luxury-black);
 }
 
 [data-theme="light"] ::-webkit-scrollbar-track {
-  background: #E9E9E7;
+  background: var(--luxury-black);
 }
 [data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: #6D8E1B;
+  background: var(--olive-green);
 }
 
 /* Redefine transparent border classes on light theme for stunning visibility */
@@ -169,34 +211,29 @@ body, main, section, footer, header, .glass-panel, .bg-luxury-black, .bg-luxury-
   background-color: rgba(15, 18, 14, 0.08) !important;
 }
 [data-theme="light"] .bg-white {
-  background-color: #0C0F0A !important;
-  color: #E9E9E7 !important;
+  background-color: var(--luxury-cream) !important;
+  color: var(--luxury-black) !important;
 }
 [data-theme="light"] .text-black {
-  color: #E9E9E7 !important;
+  color: var(--luxury-black) !important;
 }
 [data-theme="light"] .bg-black {
   background-color: #FFFFFF !important;
-  color: #0C0F0A !important;
+  color: var(--luxury-black) !important;
 }
 [data-theme="light"] .text-white {
-  color: #0C0F0A !important;
+  color: var(--luxury-black) !important;
 }
 
-/* Class-based containers translation on light theme to prevent dark-on-dark blocks */
-[data-theme="light"] .bg-\[\#0E0E0E\] {
-  background-color: #E9E9E7 !important; /* Soft White */
-}
-[data-theme="light"] .bg-\[\#0B0B0B\] {
-  background-color: #E9E9E7 !important; /* Soft White */
-}
+[data-theme="light"] .bg-\[\#0E0E0E\],
+[data-theme="light"] .bg-\[\#0B0B0B\],
 [data-theme="light"] .bg-\[\#000\] {
-  background-color: #E9E9E7 !important; /* Soft White */
+  background-color: var(--luxury-black) !important;
 }
 [data-theme="light"] .bg-\[\#111\] {
-  background-color: #FFFFFF !important; /* Pure White card */
+  background-color: var(--luxury-charcoal) !important;
   border-color: rgba(15, 18, 14, 0.12) !important;
-  color: #0C0F0A !important;
+  color: var(--luxury-cream) !important;
 }
 [data-theme="light"] .bg-\[\#111\]\/50 {
   background-color: rgba(255, 255, 255, 0.65) !important; /* Translucent Card */
@@ -238,26 +275,24 @@ body, main, section, footer, header, .glass-panel, .bg-luxury-black, .bg-luxury-
 [data-theme="light"] .bg-\[\#121611\] {
   background-color: rgba(255, 255, 255, 0.8) !important;
 }
-[data-theme="light"] .bg-\[\#070707\] {
-  background-color: #FFFFFF !important;
-}
+[data-theme="light"] .bg-\[\#070707\],
 [data-theme="light"] .bg-\[\#0A0D08\] {
-  background-color: #FFFFFF !important;
+  background-color: var(--luxury-charcoal) !important;
 }
 [data-theme="light"] .bg-black\/30 {
   background-color: rgba(15, 18, 14, 0.05) !important;
 }
 
-/* Replace hardcoded text-color links that target light theme to turn dark olive */
+/* Replace hardcoded text-color links that target light theme */
 [data-theme="light"] .text-\[\#B7BE43\] {
-  color: #6D8E1B !important; /* Olive Green as contrast fallback for text and tags */
+  color: var(--luxury-gold) !important;
 }
 [data-theme="light"] .bg-\[\#B7BE43\] {
-  background-color: #6D8E1B !important; /* Olive Green for badges and triggers */
-  color: #E9E9E7 !important;
+  background-color: var(--luxury-gold) !important;
+  color: var(--luxury-black) !important;
 }
 [data-theme="light"] .border-\[\#B7BE43\] {
-  border-color: #6D8E1B !important;
+  border-color: var(--luxury-gold) !important;
 }
 
 /* Glassmorphism adjustment on Light Mode */
@@ -342,4 +377,50 @@ body, main, section, footer, header, .glass-panel, .bg-luxury-black, .bg-luxury-
 [data-theme="light"] .bg-black\/60 {
   border-color: rgba(15, 18, 14, 0.15) !important;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide navigation, footers, and other interactive elements */
+  nav, header, footer, .grain-overlay, button, .no-print, [role="navigation"], .floating-widget {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for printing */
+  body, main, section, .glass-panel, .bg-luxury-black, .bg-luxury-charcoal {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Optimize high-contrast text */
+  * {
+    color: black !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Allow images to print well, prevent breaking inside cards/images */
+  img, svg {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Headings and specific elements */
+  h1, h2, h3, h4, h5, h6, .text-luxury-gold, .text-luxury-cream, .text-zinc-300, .text-zinc-400 {
+    color: black !important;
+  }
+
+  /* Break pages properly */
+  section {
+    page-break-inside: avoid;
+  }
+
+  /* Simplify container widths */
+  .max-w-7xl, .max-w-6xl, .max-w-5xl, .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
 

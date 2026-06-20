@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { WORK_ITEMS } from "../data";
+import { motion, AnimatePresence, useScroll, useSpring } from "motion/react";
+import { WorkItem } from "../types";
 import { audioService } from "../utils/audio";
-import { ArrowLeft, Camera, Compass, CheckCircle2, Sparkles, Play, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Camera, Calendar, User, Image as ImageIcon, CheckCircle2, ChevronLeft, ChevronRight, X, Loader2, ArrowRight, Play } from "lucide-react";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import LazyImage from "./LazyImage";
+import Logo from "./Logo";
 
 interface WorkDetailProps {
   workId: string;
@@ -11,30 +15,44 @@ interface WorkDetailProps {
 }
 
 export default function WorkDetail({ workId, onBack, onNavigateToContact }: WorkDetailProps) {
-  const work = WORK_ITEMS.find((w) => w.id === workId);
-
-  // Immersive Lightbox state
-  const [activeImgIndex, setActiveImgIndex] = useState<number | null>(null);
-
-  // Fallback before/after image pool links if specific isn't assigned
-  const beforeImg = "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80&w=1200";
-  const afterImg = work?.image || beforeImg;
+  const [work, setWork] = useState<WorkItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Scroll to top immediately when viewing a detail project case-study
+    async function fetchWork() {
+      try {
+        const docRef = doc(db, "portfolio", workId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setWork({ id: snap.id, ...snap.data() } as WorkItem);
+        } else {
+          setWork(null);
+        }
+      } catch (err) {
+        setWork(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchWork();
+  }, [workId]);
+
+  const [activeImgIndex, setActiveImgIndex] = useState<number | null>(null);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" as any });
   }, [workId]);
 
-  // Keyboard navigation for Lightbox
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeImgIndex === null || !work?.galleryImages) return;
+      const allImages = work ? [work.image, ...(work.galleryImages || [])] : [];
+      if (activeImgIndex === null || allImages.length === 0) return;
       if (e.key === "ArrowRight") {
         audioService.playWhoosh();
-        setActiveImgIndex((activeImgIndex + 1) % work.galleryImages.length);
+        setActiveImgIndex((activeImgIndex + 1) % allImages.length);
       } else if (e.key === "ArrowLeft") {
         audioService.playWhoosh();
-        setActiveImgIndex((activeImgIndex - 1 + work.galleryImages.length) % work.galleryImages.length);
+        setActiveImgIndex((activeImgIndex - 1 + allImages.length) % allImages.length);
       } else if (e.key === "Escape") {
         audioService.playClick();
         setActiveImgIndex(null);
@@ -44,6 +62,24 @@ export default function WorkDetail({ workId, onBack, onNavigateToContact }: Work
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeImgIndex, work]);
+
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
+  const [mosaicIndex, setMosaicIndex] = useState(0);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+
+  if (loading) {
+    return (
+      <div className="py-36 text-center text-luxury-cream">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto text-luxury-gold" />
+      </div>
+    );
+  }
 
   if (!work) {
     return (
@@ -66,6 +102,8 @@ export default function WorkDetail({ workId, onBack, onNavigateToContact }: Work
     onNavigateToContact();
   };
 
+  const allImages = [work.image, ...(work.galleryImages || [])];
+
   const handleOpenLightbox = (index: number) => {
     audioService.playClick();
     setActiveImgIndex(index);
@@ -78,35 +116,94 @@ export default function WorkDetail({ workId, onBack, onNavigateToContact }: Work
 
   const handleNextImg = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (activeImgIndex === null || !work.galleryImages) return;
+    if (activeImgIndex === null) return;
     audioService.playWhoosh();
-    setActiveImgIndex((activeImgIndex + 1) % work.galleryImages.length);
+    setActiveImgIndex((activeImgIndex + 1) % allImages.length);
   };
 
   const handlePrevImg = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (activeImgIndex === null || !work.galleryImages) return;
+    if (activeImgIndex === null) return;
     audioService.playWhoosh();
-    setActiveImgIndex((activeImgIndex - 1 + work.galleryImages.length) % work.galleryImages.length);
+    setActiveImgIndex((activeImgIndex - 1 + allImages.length) % allImages.length);
   };
 
+  const scrollToMobileIndex = (index: number) => {
+    if (mobileScrollRef.current) {
+      const children = mobileScrollRef.current.children;
+      if (children && children[index]) {
+        (children[index] as HTMLElement).scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center"
+        });
+      }
+    }
+  };
+
+  const handleMobileScroll = () => {
+    if (mobileScrollRef.current) {
+      const container = mobileScrollRef.current;
+      const scrollLeft = container.scrollLeft;
+      const width = container.clientWidth;
+      if (width > 0) {
+        const activeIndex = Math.round(scrollLeft / width);
+        if (activeIndex >= 0 && activeIndex < allImages.length && activeIndex !== mosaicIndex) {
+          setMosaicIndex(activeIndex);
+        }
+      }
+    }
+  };
+
+  // Pagination for the mosaic
+  const pageSize = 5;
+  
+  const handleNextMosaic = () => {
+    audioService.playWhoosh();
+    setMosaicIndex(prev => {
+      const nextIdx = (prev + 1) % allImages.length;
+      scrollToMobileIndex(nextIdx);
+      return nextIdx;
+    });
+  };
+
+  const handlePrevMosaic = () => {
+    audioService.playWhoosh();
+    setMosaicIndex(prev => {
+      const prevIdx = (prev - 1 + allImages.length) % allImages.length;
+      scrollToMobileIndex(prevIdx);
+      return prevIdx;
+    });
+  };
+
+  // Create a wraparound display list so we always have up to 5 images
+  const displayImages = [];
+  for (let i = 0; i < Math.min(pageSize, allImages.length); i++) {
+    displayImages.push({
+      url: allImages[(mosaicIndex + i) % allImages.length],
+      originalIndex: (mosaicIndex + i) % allImages.length
+    });
+  }
+
   return (
-    <div className="relative min-h-screen bg-luxury-black pb-28 md:pb-36 overflow-hidden">
-      {/* Decorative colored visual blobs */}
-      <div className="absolute top-1/4 right-[8%] w-[450px] h-[450px] bg-deep-teal/5 rounded-full filter blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 left-[5%] w-[350px] h-[350px] bg-dark-olive/6 rounded-full filter blur-[100px] pointer-events-none" />
+    <div className="relative min-h-screen bg-[#0A0A0A] font-sans pb-28 text-[#F5F5F5] selection:bg-[#B7BE43] selection:text-black">
+      <motion.div
+        style={{ scaleX }}
+        className="fixed top-0 left-0 right-0 h-[2px] bg-[#B7BE43] origin-left z-[100]"
+      />
 
       {/* Cinematic Full Header */}
       <div className="relative w-full h-[65vh] min-h-[450px] md:min-h-[580px] overflow-hidden">
         <div className="absolute inset-0">
-          <img
+          <LazyImage
             src={work.image}
-            alt={work.title}
+            alt={work.imageAlt || work.title}
             className="w-full h-full object-cover grayscale brightness-40"
-            referrerPolicy="no-referrer"
+            containerClassName="w-full h-full"
+            watermark={true}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-luxury-black via-luxury-black/30 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-luxury-black/40 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-luxury-black via-[#0A0A0A]/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/40 via-transparent to-transparent" />
         </div>
 
         {/* Float return button top corner */}
@@ -131,260 +228,349 @@ export default function WorkDetail({ workId, onBack, onNavigateToContact }: Work
               <span>NATIVE {work.category.toUpperCase()} CATALOG CASE</span>
             </div>
 
-            <h1 className="font-display font-medium text-4xl sm:text-6xl md:text-7xl text-luxury-cream leading-[1.03] tracking-tight uppercase">
+            <h1 className="font-display font-medium text-4xl sm:text-6xl md:text-7xl text-[#F5F5F5] leading-[1.03] tracking-tight uppercase">
               {work.title}
             </h1>
 
-            <div className="flex items-center space-x-3 text-[10.5px] font-mono text-[#B7BE43] tracking-wider pt-2 font-bold uppercase">
-              <span>JR FINE ART</span>
+            <div className="flex flex-wrap items-center gap-3 text-[10.5px] font-mono text-[#B7BE43] tracking-wider pt-2 font-bold uppercase">
+              <span>{work.photographerName || "JR PHOTOGRAPHY"}</span>
               <span className="w-1.5 h-1.5 bg-[#B7BE43] rounded-full" />
-              <span>REF ID: {work.id.toUpperCase()}</span>
+              <span>{work.location || "KHARAGPUR"}</span>
               <span className="w-1.5 h-1.5 bg-[#B7BE43] rounded-full" />
               <span>YEAR: {work.year}</span>
+              {work.gear && (
+                <>
+                  <span className="w-1.5 h-1.5 bg-[#B7BE43] rounded-full" />
+                  <span>GEAR: {work.gear}</span>
+                </>
+              )}
+              {work.projectStatus && (
+                <>
+                  <span className="w-1.5 h-1.5 bg-[#B7BE43] rounded-full" />
+                  <span>STATUS: {work.projectStatus}</span>
+                </>
+              )}
             </div>
 
           </div>
         </div>
       </div>
 
-      {/* Narrative grid details columns */}
-      <div className="max-w-5xl mx-auto px-6 md:px-12 pt-16 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start text-left">
-          
-          {/* Main Story Narrative (8 col of 12) */}
-          <div className="lg:col-span-8 space-y-10">
-            <div className="space-y-4">
-              <span className="text-[10px] font-mono tracking-[0.25em] text-zinc-500 uppercase block">
-                CREATIVE COMMISSION SUMMARY
-              </span>
-              <p className="text-sm sm:text-base text-luxury-cream font-light leading-relaxed tracking-wide">
-                {work.description}
-              </p>
-              <p className="text-xs sm:text-sm text-luxury-gray font-light leading-relaxed">
-                This project was orchestrated to push the boundaries of high-contrast contour strobe setups, utilizing state-of-the-art digital plates as well as hand-processed analog sheets to capture texture in micro-dimensions. Every framing, exposure setting, and physical composition was calibrated dynamically to support deep luxury brand values.
-              </p>
-            </div>
-
-            {/* Return Trigger area */}
-            <div className="pt-6">
-              <button
-                onClick={handleReturn}
-                onMouseEnter={() => audioService.playWhoosh()}
-                className="inline-flex items-center space-x-2 text-xs font-mono text-luxury-gray hover:text-[#B7BE43] uppercase tracking-widest transition-colors"
-                id="work-detail-mid-back-btn"
-              >
-                <span>← BACK TO PORTFOLIO ARCHIVES</span>
-              </button>
-            </div>
+      <div className="max-w-7xl mx-auto px-6 md:px-12 pt-16 md:pt-20">
+        {/* Project Meta Details */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 mb-20 border-b border-white/5 pb-16">
+          <div>
+             <span className="text-[9px] font-mono tracking-[0.2em] text-zinc-500 font-bold uppercase block mb-3">Project Year</span>
+             <span className="text-[13px] text-white tracking-wide uppercase">{work.year}</span>
           </div>
-
-          {/* Technical Specs Board (4 col of 12) */}
-          <div className="lg:col-span-4 space-y-8 bg-[#121611]/60 p-8 rounded-[32px] border border-white/5 relative overflow-hidden shadow-xl">
-            {/* Spotlight blur */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-deep-teal/10 rounded-full filter blur-2xl pointer-events-none" />
-
-            {/* Brief meta Table */}
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-mono tracking-widest text-[#B7BE43] uppercase font-bold border-b border-white/5 pb-2">
-                PROJECT SPECIFICATION
-              </h4>
-              <div className="space-y-3.5">
-                <div>
-                  <span className="text-[8.5px] font-mono text-zinc-500 uppercase block mb-0.5">CLIENT BRAND:</span>
-                  <span className="text-[12px] font-display font-extrabold text-[#F5F5F5] uppercase tracking-wider block">
-                    {work.client}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[8.5px] font-mono text-zinc-500 uppercase block mb-0.5">RELEASE DATE:</span>
-                  <span className="text-[12px] font-display font-extrabold text-[#F5F5F5] uppercase tracking-wider block">
-                    {work.year}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[8.5px] font-mono text-zinc-500 uppercase block mb-0.5">REPRESENTING ROLE:</span>
-                  <span className="text-[12px] font-display font-extrabold text-[#F5F5F5] uppercase tracking-wider block">
-                    {work.role}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Production features check list */}
-            <div className="space-y-4 pt-4 border-t border-white/5">
-              <h4 className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase">TACTICAL SHOT DETAILS:</h4>
-              <div className="space-y-2.5">
-                {work.details.map((detail, dIdx) => (
-                  <div key={dIdx} className="flex items-start space-x-2.5 text-xs text-[#ccc] font-light leading-snug">
-                    <CheckCircle2 className="w-4 h-4 text-[#B7BE43] mt-0.5 shrink-0" />
-                    <span>{detail}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* CTA action trigger button inside container card */}
-            <div className="pt-6 border-t border-white/5">
-              <button
-                onClick={handleBookShoot}
-                className="w-full py-4 bg-[#B7BE43] text-luxury-black font-display font-bold text-[10.5px] tracking-widest uppercase rounded-full hover:bg-white transition-colors duration-300 flex items-center justify-center space-x-2 cursor-pointer shadow-md"
-                id="work-detail-book-scale-btn"
-              >
-                <span>Inquire Custom Shoot</span>
-              </button>
-              <span className="text-[8px] font-mono text-zinc-500 tracking-wider text-center block mt-3 uppercase">
-                *Worldwide dispatch logistics managed immediately
-              </span>
-            </div>
-
+          <div>
+             <span className="text-[9px] font-mono tracking-[0.2em] text-zinc-500 font-bold uppercase block mb-3">Client</span>
+             <span className="text-[13px] text-white tracking-wide uppercase">{work.client || "Independent"}</span>
           </div>
-
+          <div>
+             <span className="text-[9px] font-mono tracking-[0.2em] text-zinc-500 font-bold uppercase block mb-3">Role</span>
+             <span className="text-[13px] text-white tracking-wide uppercase">{work.role}</span>
+          </div>
+          <div>
+             <span className="text-[9px] font-mono tracking-[0.2em] text-zinc-500 font-bold uppercase block mb-3">Location</span>
+             <span className="text-[13px] text-white tracking-wide uppercase">{work.location || "Kharagpur"}</span>
+          </div>
+          <div>
+             <span className="text-[9px] font-mono tracking-[0.2em] text-zinc-500 font-bold uppercase block mb-3">Gear</span>
+             <span className="text-[13px] text-white tracking-wide uppercase">{work.gear || "Digital"}</span>
+          </div>
+          <div>
+             <span className="text-[9px] font-mono tracking-[0.2em] text-zinc-500 font-bold uppercase block mb-3">Status</span>
+             <span className="text-[13px] text-white tracking-wide uppercase">{work.projectStatus || "Completed"}</span>
+          </div>
         </div>
 
-        {/* Curated Exhibition Photo Gallery Section */}
-        <div className="mt-24 pt-20 border-t border-white/5 space-y-12">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-            <div className="space-y-3.5">
-              <div className="flex items-center space-x-2 text-[10px] font-mono tracking-[0.43em] text-[#B7BE43] uppercase">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>EXHIBITION PLATES</span>
-              </div>
-              <h3 className="font-display font-medium text-3xl sm:text-4xl text-luxury-cream uppercase tracking-tight">
-                Curated Shot Collection
-              </h3>
-              <p className="text-xs sm:text-sm text-luxury-gray font-light max-w-xl leading-relaxed">
-                Explore the exclusive high-fidelity photo series captured during this masterwork session. Click on any frame to activate the premium visual lightbox player.
-              </p>
+        {/* Selected Moments Section */}
+        <div>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
+            <div className="flex items-center space-x-3 text-white uppercase tracking-widest text-[11px] font-bold font-mono">
+              <Camera className="w-4 h-4 text-[#B7BE43]" />
+              <span>SELECTED MOMENTS</span>
             </div>
             
-            <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase shrink-0">
-              {work.galleryImages?.length || 4} MASTER PLATES RELEASED
-            </span>
+            <div className="flex items-center space-x-4">
+              <div className="text-[#888] font-mono text-[10px] tracking-widest flex items-center space-x-4 border border-white/5 bg-[#121411] rounded-full px-2 py-1">
+                <button onClick={handlePrevMosaic} className="w-8 h-8 flex items-center justify-center hover:text-white hover:bg-white/5 rounded-full transition-colors">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="w-16 text-center">
+                   <span className="text-white">{mosaicIndex + 1}</span> / {allImages.length}
+                </div>
+                <button onClick={handleNextMosaic} className="w-8 h-8 flex items-center justify-center hover:text-white hover:bg-white/5 rounded-full transition-colors">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Asymmetric Elegant Photography Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {work.galleryImages?.map((imgUrl, imgIdx) => {
-              // Asymmetric style grid to make it look highly stylized like a premium exhibition
-              let colSpanClass = "col-span-1";
-              let heightClass = "h-[300px] sm:h-[360px]";
-              if (imgIdx === 0) {
-                colSpanClass = "sm:col-span-2 col-span-1";
-                heightClass = "h-[300px] sm:h-[400px]";
-              } else if (imgIdx === 3) {
-                colSpanClass = "col-span-1 sm:col-span-2 lg:col-span-1";
-                heightClass = "h-[300px] sm:h-[360px] lg:h-[400px]";
-              }
-
-              return (
-                <div
-                  key={imgIdx}
-                  className={`${colSpanClass} relative overflow-hidden rounded-[28px] border border-white/5 bg-luxury-charcoal group cursor-pointer ${heightClass} shadow-xl max-w-full`}
-                  onClick={() => handleOpenLightbox(imgIdx)}
+          {/* Mobile Snap-Scroll Carousel (under lg breakpoint) */}
+          <div className="block lg:hidden relative w-full overflow-hidden mb-12">
+            <div 
+              ref={mobileScrollRef}
+              onScroll={handleMobileScroll}
+              className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-4 pb-4 w-full"
+              style={{ 
+                scrollbarWidth: "none", 
+                msOverflowStyle: "none",
+                WebkitOverflowScrolling: "touch"
+              }}
+            >
+              {allImages.map((imgUrl, idx) => (
+                <div 
+                  key={idx}
+                  className="w-full shrink-0 snap-center rounded-2xl overflow-hidden relative cursor-pointer aspect-[4/3] max-h-[420px]"
+                  onClick={() => handleOpenLightbox(idx)}
                 >
-                  <img
-                    src={imgUrl}
-                    alt={`Exhibition sheet #${imgIdx + 1}`}
-                    className="w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-[1.04] grayscale brightness-[85%] group-hover:grayscale-0 group-hover:brightness-100"
-                    referrerPolicy="no-referrer"
+                  <img 
+                    src={imgUrl} 
+                    className="w-full h-full object-cover grayscale brightness-[85%] hover:grayscale-0 hover:brightness-100 transition-all duration-300" 
+                    alt={`Moment ${idx + 1}`} 
+                    draggable={false} 
+                    onContextMenu={(e) => e.preventDefault()} 
                   />
-                  
-                  {/* Lens focus hover indicator */}
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-[#B7BE43] text-luxury-black flex items-center justify-center scale-90 group-hover:scale-100 transition-transform duration-300 shadow-lg">
-                      <Camera className="w-5 h-5" />
-                    </div>
-                  </div>
-
-                  {/* Aesthetic plate metadata tagging */}
-                  <div className="absolute bottom-4 left-4 z-10 px-3 py-1 bg-[#0C0F0A]/90 backdrop-blur-sm rounded-lg border border-white/5 text-[8.5px] font-mono text-zinc-400 tracking-wider">
-                    PLATE {work.id.toUpperCase()}-0{imgIdx + 1}
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                    <Logo variant="monogram" className="w-16 h-16 text-white -rotate-12 select-none" />
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+            
+            {/* Visual pager indicator dots on mobile */}
+            <div className="flex justify-center items-center space-x-1.5 mt-2">
+              {allImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    audioService.playClick();
+                    setMosaicIndex(idx);
+                    scrollToMobileIndex(idx);
+                  }}
+                  className={`h-1 rounded-full transition-all duration-300 ${mosaicIndex === idx ? "w-6 bg-[#B7BE43]" : "w-1.5 bg-zinc-700 hover:bg-zinc-500"}`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
           </div>
+
+          {/* Mosaic Grid Layout exactly like the mockup */}
+          <div className="hidden lg:flex lg:flex-row gap-4 h-auto lg:h-[600px]">
+            {/* Image 1 (Left Tall) */}
+            {displayImages[0] && (
+              <div 
+                className="flex-1 rounded-2xl overflow-hidden relative group cursor-pointer lg:h-full h-[400px]"
+                onClick={() => handleOpenLightbox(displayImages[0].originalIndex)}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <img src={displayImages[0].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03] grayscale brightness-[85%] group-hover:grayscale-0 group-hover:brightness-100" alt="Moment 1" draggable={false} />
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                  <Logo variant="monogram" className="w-24 h-24 md:w-28 md:h-28 text-white -rotate-12 select-none" />
+                </div>
+              </div>
+            )}
+            
+            {/* Image 2 (Middle Tall) */}
+            {displayImages[1] && (
+              <div 
+                className="flex-1 rounded-2xl overflow-hidden relative group cursor-pointer lg:h-full h-[400px]"
+                onClick={() => handleOpenLightbox(displayImages[1].originalIndex)}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <img src={displayImages[1].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03] grayscale brightness-[85%] group-hover:grayscale-0 group-hover:brightness-100" alt="Moment 2" draggable={false} />
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                  <Logo variant="monogram" className="w-24 h-24 md:w-28 md:h-28 text-white -rotate-12 select-none" />
+                </div>
+              </div>
+            )}
+            
+            {/* Image 3, 4, 5 (Right Split) */}
+            {displayImages.length > 2 && (
+              <div className="flex-1 flex flex-col gap-4 lg:h-full h-[600px]">
+                {displayImages[2] && (
+                  <div 
+                    className="flex-[1.5] rounded-2xl overflow-hidden relative group cursor-pointer"
+                    onClick={() => handleOpenLightbox(displayImages[2].originalIndex)}
+                    onContextMenu={(e) => e.preventDefault()}
+                  >
+                    <img src={displayImages[2].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03] grayscale brightness-[85%] group-hover:grayscale-0 group-hover:brightness-100" alt="Moment 3" draggable={false} />
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                      <Logo variant="monogram" className="w-20 h-20 md:w-24 md:h-24 text-white -rotate-12 select-none" />
+                    </div>
+                  </div>
+                )}
+                <div className="flex-[1] flex gap-4">
+                  {displayImages[3] && (
+                    <div 
+                      className="flex-1 rounded-2xl overflow-hidden relative group cursor-pointer"
+                      onClick={() => handleOpenLightbox(displayImages[3].originalIndex)}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <img src={displayImages[3].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03] grayscale brightness-[85%] group-hover:grayscale-0 group-hover:brightness-100" alt="Moment 4" draggable={false} />
+                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                        <Logo variant="monogram" className="w-12 h-12 md:w-16 md:h-16 text-white -rotate-12 select-none" />
+                      </div>
+                    </div>
+                  )}
+                  {displayImages[4] && (
+                    <div 
+                      className="flex-1 rounded-2xl overflow-hidden relative group cursor-pointer"
+                      onClick={() => handleOpenLightbox(displayImages[4].originalIndex)}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <img src={displayImages[4].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03] grayscale brightness-[85%] group-hover:grayscale-0 group-hover:brightness-100" alt="Moment 5" draggable={false} />
+                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                        <Logo variant="monogram" className="w-12 h-12 md:w-16 md:h-16 text-white -rotate-12 select-none" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Lower Details Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mt-24 pt-16 border-t border-white/5">
+          <div className="space-y-6">
+            <span className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase font-bold">
+              ABOUT THIS SHOOT
+            </span>
+            <h2 className="font-display font-medium text-3xl text-white tracking-tight">
+              {work.aboutShootTitle || work.title}
+            </h2>
+            <p className="text-sm text-zinc-400 font-light leading-relaxed max-w-md">
+              {work.description}
+            </p>
+            {work.behindTheScenesLink && (
+              <a 
+                href={work.behindTheScenesLink} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="flex items-center space-x-3 px-6 py-3 border border-white/10 rounded-full hover:bg-white hover:text-black transition-all group mt-6 w-max"
+              >
+                 <span className="text-[10px] font-mono uppercase tracking-widest font-bold">View Behind The Scenes</span>
+                 <Play className="w-3.5 h-3.5 fill-current" />
+              </a>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <span className="text-[10px] font-mono tracking-widest text-[#B7BE43] uppercase font-bold">
+              HIGHLIGHTS
+            </span>
+            <div className="space-y-6 pt-2">
+              {work.details.map((detail, idx) => (
+                <div key={idx} className="flex items-start space-x-4">
+                  <div className="w-5 h-5 rounded-full border border-[#B7BE43] flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-3 h-3 text-[#B7BE43]" />
+                  </div>
+                  <span className="text-sm text-zinc-300 tracking-wide font-light leading-relaxed">{detail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom CTA Block */}
+        <div className="mt-24 bg-[#121411] border border-white/5 rounded-[32px] p-10 md:p-16 flex flex-col md:flex-row justify-between items-start md:items-center gap-10">
+          <div className="flex items-center gap-8">
+            <div className="w-20 h-20 rounded-full bg-[#1A1D1A] border border-white/5 flex items-center justify-center shrink-0">
+               <Camera className="w-8 h-8 text-white" />
+            </div>
+            <div className="space-y-3">
+              <span className="text-[10px] font-mono tracking-[0.2em] text-[#B7BE43] uppercase font-bold">
+                {work.ctaSubtitle || "LET'S CREATE SOMETHING BEAUTIFUL"}
+              </span>
+              <h2 className="font-display text-4xl text-white tracking-tight">
+                {work.ctaTitle || "Have a project in mind?"}
+              </h2>
+              <p className="text-zinc-400 text-sm max-w-md">
+                {work.ctaDesc || "I'm available for travel worldwide. Let's capture your story with authenticity, emotion, and artistry."}
+              </p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={handleBookShoot}
+            className="px-8 py-4 bg-[#B7BE43] text-black font-mono font-bold text-[11px] tracking-widest uppercase rounded-full hover:bg-white transition-colors flex items-center space-x-3 shrink-0"
+          >
+            <span>{work.ctaButtonText || "GET IN TOUCH"}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
       </div>
 
-      {/* Fullscreen Photo Lightbox Player */}
+      {/* Lightbox Component remains the same */}
       <AnimatePresence>
-        {activeImgIndex !== null && work.galleryImages && (
+        {activeImgIndex !== null && allImages.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/98 backdrop-blur-lg px-4"
+            className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#070906]/98 backdrop-blur-xl px-4"
             onClick={handleCloseLightbox}
           >
-            {/* Top Bar: Counter & Dismiss */}
             <div className="absolute top-8 left-6 right-6 flex justify-between items-center z-10">
               <span className="text-[10px] font-mono text-zinc-400 tracking-widest uppercase">
-                PLATE {activeImgIndex + 1} OF {work.galleryImages.length}
+                PLATE {activeImgIndex + 1} OF {allImages.length}
               </span>
               <button
                 onClick={handleCloseLightbox}
-                className="p-3 bg-white/5 hover:bg-[#B7BE43] text-luxury-cream hover:text-luxury-black rounded-full transition-colors duration-300 cursor-pointer"
-                id="lightbox-close-btn"
-                aria-label="Close Lightbox"
+                className="p-3 bg-white/5 hover:bg-[#B7BE43] text-white hover:text-black rounded-full transition-colors duration-300"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Central Slide Content Framed and Counter Balanced */}
-            <div className="relative max-w-5xl w-full max-h-[75vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-              {/* Previous Photo Trigger */}
+            <div className="relative max-w-6xl w-full h-[80vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={handlePrevImg}
-                className="absolute left-2 sm:left-4 z-20 w-12 h-12 rounded-full bg-black/70 hover:bg-[#B7BE43] text-luxury-cream hover:text-luxury-black border border-white/10 flex items-center justify-center transition-colors duration-300 cursor-pointer shadow-lg"
-                id="lightbox-prev-btn"
-                aria-label="Previous plate"
+                className="absolute left-0 lg:-left-12 w-12 h-12 rounded-full bg-black/50 hover:bg-[#B7BE43] text-white hover:text-black border border-white/10 flex items-center justify-center transition-colors z-20"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
 
-              {/* Display Element */}
-              <div className="overflow-hidden rounded-2xl border border-white/10 max-h-[75vh] mx-10 sm:mx-16 bg-zinc-900/40">
+              <div className="relative max-w-full max-h-full flex items-center justify-center" onContextMenu={(e) => e.preventDefault()}>
                 <motion.img
                   key={activeImgIndex}
-                  src={work.galleryImages[activeImgIndex]}
-                  alt={`Selected exhibition sheet ${activeImgIndex + 1}`}
-                  className="max-w-full max-h-[75vh] object-contain rounded-2xl"
-                  initial={{ opacity: 0, scale: 0.97 }}
+                  src={allImages[activeImgIndex]}
+                  alt={`Plate ${activeImgIndex + 1}`}
+                  className="max-w-full max-h-full object-contain rounded-xl"
+                  initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
-                  transition={{ duration: 0.25 }}
-                  referrerPolicy="no-referrer"
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.3 }}
+                  draggable={false}
                 />
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 opacity-25 mix-blend-overlay">
+                  <Logo variant="monogram" className="w-32 h-32 md:w-48 md:h-48 text-white -rotate-12 select-none" />
+                </div>
               </div>
 
-              {/* Next Photo Trigger */}
               <button
                 onClick={handleNextImg}
-                className="absolute right-2 sm:right-4 z-20 w-12 h-12 rounded-full bg-black/70 hover:bg-[#B7BE43] text-luxury-cream hover:text-luxury-black border border-white/10 flex items-center justify-center transition-colors duration-300 cursor-pointer shadow-lg"
-                id="lightbox-next-btn"
-                aria-label="Next plate"
+                className="absolute right-0 lg:-right-12 w-12 h-12 rounded-full bg-black/50 hover:bg-[#B7BE43] text-white hover:text-black border border-white/10 flex items-center justify-center transition-colors z-20"
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Bottom Credits / Play guide labels */}
             <div className="absolute bottom-8 text-center px-4" onClick={(e) => e.stopPropagation()}>
-              <h4 className="font-display text-sm sm:text-base font-bold uppercase text-luxury-cream tracking-wide">
+              <h4 className="font-display text-base font-bold uppercase tracking-wide text-white">
                 {work.title}
               </h4>
               <span className="text-[9px] font-mono text-zinc-500 tracking-widest uppercase block mt-1.5 leading-none">
-                USE ← AND → KEYBOARD KEYS OR CLICK BUTTONS TO EXPLORE
+                USE ← AND → KEYBOARD KEYS TO EXPLORE
               </span>
             </div>
-
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }

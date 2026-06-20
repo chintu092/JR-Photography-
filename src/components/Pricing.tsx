@@ -1,10 +1,12 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
-import { PRICING_PLANS } from "../data";
 import { PricingTier } from "../types";
-import { Check, Star, AlertCircle, ArrowRight, Sparkles, Crown, Diamond } from "lucide-react";
+import { Check, Star, AlertCircle, ArrowRight, Sparkles, Crown, Diamond, Loader2 } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { db } from "../lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { PRICING_PLANS as fallbackPricingTiers } from "../data";
 
 interface PricingCardProps {
   key?: React.Key;
@@ -15,6 +17,7 @@ interface PricingCardProps {
 
 function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
   const markerRef = useRef<HTMLDivElement>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<string>("default");
 
   // Track the scroll of a hidden flow marker positioned above the card
   const { scrollYProgress } = useScroll({
@@ -28,8 +31,9 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
   const overlayOpacity = useTransform(scrollYProgress, [0, 0.85], [0, 0.5]);
 
   // Map icons and specific styles per tier
-  const getTierMetadata = (id: string) => {
-    switch (id) {
+  const getTierMetadata = (stylePreset?: string, idx: number = 0) => {
+    const preset = stylePreset || `p${(idx % 3) + 1}`;
+    switch (preset) {
       case "p1":
         return {
           icon: <Sparkles className="w-5 h-5 text-luxury-gold" />,
@@ -70,7 +74,63 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
     }
   };
 
-  const meta = getTierMetadata(tier.id);
+  const meta = getTierMetadata(tier.stylePreset, index);
+
+  const isDefaultSelected = selectedVariantId === "default";
+  const activeVariant = (tier.variants || []).find(v => v.id === selectedVariantId);
+
+  const displayName = isDefaultSelected 
+    ? tier.name 
+    : (activeVariant?.name || tier.name);
+
+  const displayPrice = isDefaultSelected 
+    ? tier.price 
+    : activeVariant?.price;
+
+  const displayDelivery = isDefaultSelected 
+    ? (tier.duration || meta.duration) 
+    : activeVariant?.duration;
+
+  // Plan description always remains static and same for all options
+  const displayDescription = tier.description;
+
+  // Plan features update dynamically based on the selected variant's description/services list
+  const displayFeatures = isDefaultSelected
+    ? (tier.features || [])
+    : (activeVariant?.description || "")
+        .split(/[,\n]/)
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+
+  const getSelectedStyle = (isSelected: boolean) => {
+    if (isSelected) {
+      switch (tier.stylePreset || `p${(index % 3) + 1}`) {
+        case "p1":
+          return "bg-luxury-gold/10 text-luxury-gold border-luxury-gold/30 shadow-lg shadow-luxury-gold/5";
+        case "p2":
+          return "bg-[#DE8E67]/10 text-[#DE8E67] border-[#DE8E67]/30 shadow-lg shadow-[#DE8E67]/5";
+        case "p3":
+        default:
+          return "bg-[#1E5662]/10 text-[#54B1C5] border-[#1E5662]/30 shadow-lg shadow-[#1E5662]/5";
+      }
+    }
+    return "bg-white/[0.01]/10 text-zinc-400 border-white/5 hover:border-white/10 hover:text-white";
+  };
+
+  const getDotStyle = (isSelected: boolean) => {
+    if (isSelected) {
+      switch (tier.stylePreset || `p${(index % 3) + 1}`) {
+        case "p1":
+          return "bg-luxury-gold";
+        case "p2":
+          return "bg-[#DE8E67]";
+        case "p3":
+        default:
+          return "bg-[#54B1C5]";
+      }
+    }
+    return "bg-zinc-600";
+  };
 
   return (
     <div className="relative w-full pricing-card-wrapper opacity-0">
@@ -89,7 +149,7 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
       >
         {/* Dynamic Shadow Layer for physical depth perception */}
         <motion.div 
-          className="absolute inset-0 bg-[#050505] pointer-events-none z-30 rounded-[40px]"
+          className="absolute inset-0 bg-luxury-black pointer-events-none z-30 rounded-[40px]"
           style={{ opacity: overlayOpacity }}
         />
 
@@ -98,7 +158,7 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
         <div className="absolute top-0 right-0 w-[20rem] h-[20rem] bg-white/[0.01] rounded-full filter blur-3xl pointer-events-none" />
 
         {/* Left side: Plan Identity & Icon */}
-        <div className="lg:w-1/2 flex flex-col justify-between relative z-10">
+        <div className="lg:w-1/2 flex flex-col justify-between relative z-10 text-left">
           <div>
             {/* Top Row: Icon squircle and Optional Highlight badge */}
             <div className="flex justify-between items-center mb-6 sm:mb-8">
@@ -115,18 +175,18 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
             </div>
 
             {/* Heading */}
-            <h3 className="font-display text-2xl sm:text-4.5xl font-black uppercase text-luxury-cream tracking-tight max-w-sm leading-none mb-4">
-              {tier.name}
+            <h3 className="font-display text-2xl sm:text-4.5xl font-black uppercase text-luxury-cream tracking-tight max-w-sm leading-none mb-4 min-h-[3rem] line-clamp-2">
+              {displayName}
             </h3>
 
             {/* Descr */}
-            <p className="text-xs sm:text-sm text-luxury-gray font-light leading-relaxed max-w-md">
-              {tier.description}
+            <p className="text-xs sm:text-sm text-luxury-gray font-light leading-relaxed max-w-md min-h-[4rem]">
+              {displayDescription}
             </p>
 
             {/* Tags */}
             <div className="flex flex-wrap gap-2 mt-5">
-              {tier.tags.map((tag, tIdx) => (
+              {(tier.tags || []).map((tag, tIdx) => (
                 <span
                   key={tIdx}
                   className="text-[8px] font-mono tracking-widest uppercase px-2.5 py-1 rounded-full border border-white/5 bg-white/[0.01] text-zinc-400"
@@ -135,6 +195,35 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
                 </span>
               ))}
             </div>
+
+            {/* Variants Radio Toggle Group */}
+            {tier.variants && tier.variants.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
+                <span className="text-[9px] font-mono tracking-[0.22em] text-[#cfb53b] uppercase block font-bold">
+                  Select Package Variant
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedVariantId("default")}
+                    className={`px-3 py-2 rounded-xl text-[9.5px] font-mono tracking-wider uppercase border transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${getSelectedStyle(selectedVariantId === "default")}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full transition-transform ${getDotStyle(selectedVariantId === "default")}`} />
+                    Standard Rate
+                  </button>
+
+                  {tier.variants.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVariantId(v.id)}
+                      className={`px-3 py-2 rounded-xl text-[9.5px] font-mono tracking-wider uppercase border transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${getSelectedStyle(selectedVariantId === v.id)}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full transition-transform ${getDotStyle(selectedVariantId === v.id)}`} />
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Delivery Time Info at the bottom */}
@@ -143,21 +232,18 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
               ESTIMATED DELIVERY
             </span>
             <span className="text-xs font-mono font-bold text-luxury-cream tracking-wider">
-              {meta.duration}
+              {displayDelivery}
             </span>
           </div>
         </div>
 
         {/* Right side: Price & Features checklist */}
-        <div className="lg:w-1/2 flex flex-col justify-between relative z-10 lg:border-l lg:border-white/5 lg:pl-12">
+        <div className="lg:w-1/2 flex flex-col justify-between relative z-10 lg:border-l lg:border-white/5 lg:pl-12 text-left">
           <div>
             {/* Huge Price Display */}
-            <div className="flex items-baseline space-x-2 pb-5 sm:pb-6">
-              <span className={`text-4xl sm:text-6xl font-display font-black tracking-tight ${meta.priceColor}`}>
-                {tier.price}
-              </span>
-              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.18em]">
-                / deposit foundation
+            <div className="flex items-baseline pb-5 sm:pb-6">
+              <span className={`text-4xl sm:text-6xl font-display font-black tracking-tight whitespace-nowrap ${meta.priceColor}`}>
+                {displayPrice}
               </span>
             </div>
 
@@ -165,9 +251,9 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
             <div className="border-t border-white/5 w-full mb-6" />
 
             {/* Features items */}
-            <ul className="space-y-4 mb-8 sm:mb-10">
-              {tier.features.map((feature, fIdx) => (
-                <li key={fIdx} className="flex items-start space-x-3.5 text-[11px] sm:text-xs text-luxury-cream">
+            <ul className="space-y-4 mb-8 sm:mb-10 animate-fade-in">
+              {displayFeatures.map((feature, fIdx) => (
+                <li key={fIdx} className="flex items-start space-x-3.5 text-[11px] sm:text-xs text-luxury-cream animate-none">
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center border shrink-0 mt-0.5 ${meta.checkBg}`}>
                     <Check className="w-3 h-3" />
                   </div>
@@ -180,15 +266,15 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
           {/* Action Button & Disclaimer info */}
           <div>
             <button
-              onClick={() => handlePricingClick(tier.name)}
-              className={`group w-full py-4.5 px-6 rounded-full font-display font-bold text-[10px] sm:text-xs tracking-[0.22em] uppercase focus:outline-none transition-all duration-300 ${meta.buttonStyle} flex items-center justify-center space-x-2`}
+              onClick={() => handlePricingClick(displayName)}
+              className="group w-full py-4.5 px-6 rounded-full font-mono font-bold text-[10px] sm:text-[11px] tracking-[0.15em] uppercase focus:outline-none transition-all bg-[#2a2c16] hover:bg-[#34371b] text-[#b6b335] flex items-center justify-center space-x-2 active:scale-95 cursor-pointer"
               id={`pricing-book-${tier.id}`}
             >
               <span>SELECT PLAN FOUNDATION</span>
               <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1.5" />
             </button>
 
-            <span className="text-[8.5px] font-mono text-[#555] text-center block mt-3.5 uppercase tracking-widest">
+            <span className="text-[8.5px] font-mono text-zinc-500 text-center block mt-3.5 uppercase tracking-widest">
               * Complete NDA options and customizable riders available
             </span>
           </div>
@@ -200,8 +286,38 @@ function PricingCard({ tier, index, handlePricingClick }: PricingCardProps) {
 
 export default function Pricing() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [plans, setPlans] = useState<PricingTier[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchTiers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "pricing_plans"));
+        let fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PricingTier));
+        if (fetched.length > 0) {
+          fetched.sort((a, b) => {
+            const orderA = a.order !== undefined ? a.order : 999;
+            const orderB = b.order !== undefined ? b.order : 999;
+            return orderA - orderB;
+          });
+          setPlans(fetched);
+        } else {
+          // Fallback to offline hardcoded
+          setPlans(fallbackPricingTiers);
+        }
+      } catch (err) {
+        console.error("Error loading dynamic plans, falling back:", err);
+        setPlans(fallbackPricingTiers);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTiers();
+  }, []);
+
+  useEffect(() => {
+    if (loading || plans.length === 0) return;
+
     gsap.registerPlugin(ScrollTrigger);
 
     const cards = containerRef.current?.querySelectorAll(".pricing-card-wrapper");
@@ -231,11 +347,21 @@ export default function Pricing() {
       });
     }, containerRef);
 
+    // Refresh layout geometry
+    ScrollTrigger.refresh();
+
     return () => ctx.revert();
-  }, []);
+  }, [loading, plans]);
 
   const handlePricingClick = (planName: string) => {
-    // Fill the contact form subject and scroll to contact
+    // 1. Store the selected plan globally for Wayfic dynamic form prepopulation
+    (window as any).pendingSelectedPlan = planName;
+
+    // 2. Dispatch event to update form values if WayficFormRenderer is already rendered
+    const applyEvent = new CustomEvent("apply-plan-selection", { detail: { planName } });
+    window.dispatchEvent(applyEvent);
+
+    // 3. Fallback for static elements (pre-existing elements)
     const contactSubject = document.getElementById("contact-subject") as HTMLInputElement;
     if (contactSubject) {
       contactSubject.value = `Inquire Shoot Tier: ${planName}`;
@@ -244,21 +370,30 @@ export default function Pricing() {
     if (messageField) {
       messageField.value = `Hello JR Photography team, I would like to inquire about the physical and visual details of the "${planName}" package. Please let us know raw dates calendar availability.`;
     }
+
+    // 4. Handle navigation / scroll redirect
     const contactSection = document.getElementById("contact");
-    contactSection?.scrollIntoView({ behavior: "smooth" });
+    if (contactSection) {
+      contactSection.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // If we are on an inner page (like services tab) where the contact section is not present:
+      // Redirect to the dedicated contact portal page
+      const navEvent = new CustomEvent("navigate-to-page", { detail: "contact" });
+      window.dispatchEvent(navEvent);
+    }
   };
 
   return (
     <section 
       ref={containerRef}
       id="pricing" 
-      className="relative py-24 md:py-36 bg-[#090909] overflow-hidden px-6 md:px-12 border-t border-white/5"
+      className="relative py-24 md:py-36 bg-luxury-black overflow-hidden px-6 md:px-12 border-t border-white/5"
     >
       {/* Background neon visual ambient element */}
       <div className="absolute top-[30%] right-[5%] w-[45rem] h-[45rem] bg-luxury-gold/5 rounded-full filter blur-3xl pointer-events-none" />
       <div className="absolute bottom-[20%] left-[5%] w-[35rem] h-[35rem] bg-[#DE8E67]/3 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl 3xl:max-w-[1440px] mx-auto relative z-10">
+      <div className="max-w-5xl mx-auto relative z-10">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 md:mb-28 gap-6">
@@ -276,19 +411,35 @@ export default function Pricing() {
         </div>
 
         {/* Stacked Interactive Cards Wrapper */}
-        <div className="relative pt-4 pb-12 flex flex-col">
-          {PRICING_PLANS.map((tier, index) => (
-            <PricingCard
-              key={tier.id}
-              tier={tier}
-              index={index}
-              handlePricingClick={handlePricingClick}
-            />
-          ))}
+        <div className="relative pt-4 pb-12 flex flex-col min-h-[300px] justify-center">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-24 space-y-4 text-luxury-gold">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <span className="text-[10px] uppercase font-mono tracking-widest text-[#cfb53b]">Aligning dynamic collections...</span>
+            </div>
+          ) : plans.filter(tier => tier.active !== false).length === 0 ? (
+            <div className="text-center py-24 bg-[#0a0a0a]/40 border border-white/5 rounded-[40px] animate-in fade-in duration-500">
+              <span className="text-[10px] font-mono tracking-[0.3em] text-[#cfb53b] uppercase block mb-3 font-bold">
+                COMMISSIONS FULL
+              </span>
+              <p className="text-xs text-luxury-gray font-light max-w-sm mx-auto leading-relaxed">
+                All foundational packages are currently reserved. Please request a customized proposal below to secure calendar priority bookings.
+              </p>
+            </div>
+          ) : (
+            plans.filter(tier => tier.active !== false).map((tier, index) => (
+              <PricingCard
+                key={tier.id}
+                tier={tier}
+                index={index}
+                handlePricingClick={handlePricingClick}
+              />
+            ))
+          )}
         </div>
 
         {/* Pricing Help Notice block */}
-        <div className="glass-panel p-6 sm:p-8 rounded-[32px] mt-16 flex flex-col md:flex-row justify-between items-center bg-[#111]/30 border border-white/5 gap-6">
+        <div className="glass-panel p-6 sm:p-8 rounded-[32px] mt-16 flex flex-col md:flex-row justify-between items-center bg-luxury-black/30 border border-white/5 gap-6">
           <div className="flex items-center space-x-4 max-w-xl text-left">
             <AlertCircle className="w-5 h-5 text-luxury-gold shrink-0" />
             <p className="text-xs text-luxury-gray font-light leading-relaxed">
@@ -300,7 +451,7 @@ export default function Pricing() {
               const el = document.getElementById("contact");
               el?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="px-6 py-3.5 bg-white/5 hover:bg-white hover:text-black rounded-full text-xs text-luxury-cream border border-white/10 tracking-widest uppercase whitespace-nowrap transition-all duration-300"
+            className="text-[#b6b335] hover:text-white font-mono text-[10px] sm:text-[11px] font-bold tracking-[0.16em] uppercase cursor-pointer transition-all duration-300 py-2 border-b border-[#b6b335]/30 hover:border-[#b6b335]"
             id="pricing-custom-inquiry-btn"
           >
             Request Private NDA Custom Proposal

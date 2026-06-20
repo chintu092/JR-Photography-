@@ -4,17 +4,29 @@ interface LogoProps {
   variant?: "icon" | "full" | "monogram";
   className?: string;
   glow?: boolean;
+  src?: string | null;
+  brandTextLine1?: string;
+  brandTextLine2?: string;
 }
 
-export default function Logo({ variant = "full", className = "w-48 h-auto", glow = false }: LogoProps) {
+export default function Logo({ 
+  variant = "full", 
+  className = "w-48 h-auto", 
+  glow = false, 
+  src = null,
+  brandTextLine1 = "JR",
+  brandTextLine2 = "PHOTOGRAPHY"
+}: LogoProps) {
   const [hasError, setHasError] = useState(false);
 
-  // If we should load the custom uploaded site_logo.png and it hasn't failed to load
-  if (!hasError) {
+  // If we have a custom source from dynamic settings or local asset
+  const logoSrc = src || (hasError ? null : "/assets/image/Logo/site_logo.png");
+
+  if (logoSrc) {
     if (variant === "monogram") {
       return (
         <img
-          src="/assets/image/Logo/site_logo.png"
+          src={logoSrc}
           alt="JR Monogram"
           onError={() => setHasError(true)}
           className={`${className} object-contain ${glow ? "drop-shadow-[0_0_15px_rgba(255,255,255,0.25)]" : ""}`}
@@ -27,7 +39,7 @@ export default function Logo({ variant = "full", className = "w-48 h-auto", glow
       return (
         <div className="flex items-center space-x-3 select-none">
           <img
-            src="/assets/image/Logo/site_logo.png"
+            src={logoSrc}
             alt="JR Logo Icon"
             onError={() => setHasError(true)}
             className="w-12 h-12 md:w-14 md:h-14 object-contain transition-all duration-300 group-hover:scale-105"
@@ -35,10 +47,10 @@ export default function Logo({ variant = "full", className = "w-48 h-auto", glow
           />
           <div className="flex flex-col -space-y-0.5 border-l border-white/15 pl-3">
             <span className="text-[12px] md:text-[13px] font-sans font-bold tracking-[0.3em] text-luxury-cream uppercase leading-none">
-              JR
+              {brandTextLine1}
             </span>
             <span className="text-[8px] md:text-[8.5px] font-sans font-medium tracking-[0.18em] text-luxury-gold uppercase leading-none mt-1">
-              PHOTOGRAPHY
+              {brandTextLine2}
             </span>
           </div>
         </div>
@@ -49,7 +61,7 @@ export default function Logo({ variant = "full", className = "w-48 h-auto", glow
     return (
       <div className="flex flex-col items-center justify-center select-none">
         <img
-          src="/assets/image/Logo/site_logo.png"
+          src={logoSrc}
           alt="JR Photography Full Logo"
           onError={() => setHasError(true)}
           className={`${className} object-contain h-auto ${glow ? "drop-shadow-[0_0_20px_rgba(255,255,255,0.15)]" : ""}`}
@@ -128,10 +140,10 @@ export default function Logo({ variant = "full", className = "w-48 h-auto", glow
         </svg>
         <div className="flex flex-col -space-y-0.5 border-l border-white/15 pl-3">
           <span className="text-[12px] md:text-[13px] font-sans font-bold tracking-[0.3em] text-white uppercase leading-none">
-            JR
+            {brandTextLine1}
           </span>
           <span className="text-[8px] md:text-[8.5px] font-sans font-medium tracking-[0.18em] text-luxury-gold uppercase leading-none mt-1">
-            PHOTOGRAPHY
+            {brandTextLine2}
           </span>
         </div>
       </div>

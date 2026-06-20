@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "motion/react";
 import { Twitter, Dribbble, Instagram, Camera, Sparkles } from "lucide-react";
 import { audioService } from "../utils/audio";
+import LazyImage from "./LazyImage";
 
 const EXPERIENCES = [
   { role: "Founder at JR Studio", years: "2024-Now" },
@@ -27,7 +28,7 @@ export default function Founder() {
         Meet Jayanta
       </div>
 
-      <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] 3xl:max-w-[1600px] mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-16 lg:gap-24 items-center">
           
           {/* Left Column: Portrait Frame with award badge and hover triggers */}
@@ -40,14 +41,14 @@ export default function Founder() {
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
             >
               {/* Background gradient glowing behind portrait */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-orange-600/30 via-[#B7BE43]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 z-10 mix-blend-color-add pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-orange-600/30 via-luxury-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 z-10 mix-blend-color-add pointer-events-none" />
 
               {/* Founder Image */}
-              <img
+              <LazyImage
                 src="/assets/image/Founder/profile.jpg"
                 alt="Jayanta Roy Founder"
                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-[1200ms] ease-out brightness-95 group-hover:scale-[1.03]"
-                referrerPolicy="no-referrer"
+                containerClassName="w-full h-full"
               />
 
               {/* Soft overlay gradient mimicking warm orange/red lighting in mockup split tone */}
@@ -61,7 +62,7 @@ export default function Founder() {
                   rel="noreferrer"
                   onClick={handleInteract}
                   onMouseEnter={handleHover}
-                  className="p-3 rounded-full bg-[#111310]/80 backdrop-blur-md text-luxury-cream border border-white/10 hover:bg-[#B7BE43] hover:text-luxury-black hover:border-transparent transition-all duration-300"
+                  className="p-3 rounded-full bg-luxury-black/80 backdrop-blur-md text-luxury-cream border border-white/10 hover:bg-luxury-gold hover:text-luxury-black hover:border-transparent transition-all duration-300"
                   aria-label="Twitter X link"
                   id="founder-sm-tw"
                 >
@@ -73,7 +74,7 @@ export default function Founder() {
                   rel="noreferrer"
                   onClick={handleInteract}
                   onMouseEnter={handleHover}
-                  className="p-3 rounded-full bg-[#111310]/80 backdrop-blur-md text-luxury-cream border border-white/10 hover:bg-[#B7BE43] hover:text-luxury-black hover:border-transparent transition-all duration-300"
+                  className="p-3 rounded-full bg-luxury-black/80 backdrop-blur-md text-luxury-cream border border-white/10 hover:bg-luxury-gold hover:text-luxury-black hover:border-transparent transition-all duration-300"
                   aria-label="Dribbble link"
                   id="founder-sm-db"
                 >
@@ -85,7 +86,7 @@ export default function Founder() {
                   rel="noreferrer"
                   onClick={handleInteract}
                   onMouseEnter={handleHover}
-                  className="p-3 rounded-full bg-[#111310]/80 backdrop-blur-md text-luxury-cream border border-white/10 hover:bg-[#B7BE43] hover:text-luxury-black hover:border-transparent transition-all duration-300"
+                  className="p-3 rounded-full bg-luxury-black/80 backdrop-blur-md text-luxury-cream border border-white/10 hover:bg-luxury-gold hover:text-luxury-black hover:border-transparent transition-all duration-300"
                   aria-label="Instagram link"
                   id="founder-sm-ig"
                 >
@@ -94,13 +95,13 @@ export default function Founder() {
               </div>
 
               {/* Floating Award Rotating Badge in corner */}
-              <div className="absolute bottom-6 right-6 z-20 select-none bg-[#111310]/90 border border-white/10 p-2 rounded-full shadow-lg shadow-black/50 backdrop-blur-sm group-hover:border-[#B7BE43]/40 transition-colors duration-500">
+              <div className="absolute bottom-6 right-6 z-20 select-none bg-luxury-black/90 border border-white/10 p-2 rounded-full shadow-lg shadow-black/50 backdrop-blur-sm group-hover:border-luxury-gold/40 transition-colors duration-500">
                 <div className="relative w-22 h-22 flex items-center justify-center">
                   <svg viewBox="0 0 100 100" className="w-22 h-22 animate-[spin_12s_linear_infinite]" id="founder-seal-svg">
                     <defs>
                       <path id="circlePath" d="M 50, 50 m -37, 0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" />
                     </defs>
-                    <text fill="#B7BE43" fontSize="8.5" className="font-mono uppercase font-bold tracking-[0.25em]">
+                    <text fill="var(--luxury-gold)" fontSize="8.5" className="font-mono uppercase font-bold tracking-[0.25em]">
                       <textPath href="#circlePath" startOffset="0%">
                         WINNING DESIGNER • SINCE 2011 •
                       </textPath>
@@ -110,7 +111,7 @@ export default function Founder() {
                   {/* Central premium camera icon inside badge */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-8 h-8 rounded-full bg-[#181d17] border border-white/5 flex items-center justify-center">
-                      <Camera className="w-3.5 h-3.5 text-[#B7BE43]" />
+                      <Camera className="w-3.5 h-3.5 text-luxury-gold" />
                     </div>
                   </div>
                 </div>
@@ -123,7 +124,7 @@ export default function Founder() {
           <div className="md:col-span-6 text-left space-y-8 order-1 md:order-2">
             
             <div className="space-y-4">
-              <div className="flex items-center space-x-2 text-[9px] font-mono tracking-[0.45em] text-[#B7BE43] uppercase">
+              <div className="flex items-center space-x-2 text-[9px] font-mono tracking-[0.45em] text-luxury-gold uppercase">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>MEET THE CREATIVE DIRECTOR</span>
               </div>
@@ -139,7 +140,7 @@ export default function Founder() {
               viewport={{ once: true }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              Jayanta Roy is a fine-art photographer and visual system architect focused on crafting bold, functional photographic legacies. He collaborates with elite fashion houses, editorial agencies, and selective matrimonial clients to balance absolute classic analog depth with micro-precision color science. Based in Paris and Milan, he experiments daily with medium format sensor dynamics in our master studio.
+              Jayanta Roy is a fine-art photographer and visual system architect focused on crafting bold, functional photographic legacies. He collaborates with elite fashion houses, editorial agencies, and selective matrimonial clients to balance absolute classic analog depth with micro-precision color science. Based in Kolkata, he experiments daily with medium format sensor dynamics in our master studio.
             </motion.p>
 
             {/* Subtle Divider */}
@@ -157,7 +158,7 @@ export default function Founder() {
                   transition={{ delay: 0.1 * idx, duration: 0.5 }}
                   onMouseEnter={handleHover}
                 >
-                  <span className="text-xs font-sans text-luxury-cream/80 group-hover/item:text-[#B7BE43] group-hover/item:translate-x-1.5 transition-all duration-300 font-medium">
+                  <span className="text-xs font-sans text-luxury-cream/80 group-hover/item:text-luxury-gold group-hover/item:translate-x-1.5 transition-all duration-300 font-medium">
                     {exp.role}
                   </span>
                   <span className="text-[10px] font-mono text-zinc-500 group-hover/item:text-luxury-cream tracking-widest transition-colors duration-300 font-light">

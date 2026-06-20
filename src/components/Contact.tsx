@@ -1,73 +1,47 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { motion } from "motion/react";
 import { Mail, Phone, MapPin, Send, Globe, Clock, Sparkles } from "lucide-react";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { StudioSettings } from "../types";
+import WayficFormRenderer from "./WayficFormRenderer";
 
-interface StudioLocation {
-  city: string;
-  address: string;
-  phone: string;
-  hours: string;
-  lat: number;
-  lng: number;
-}
-
-const STUDIOS: StudioLocation[] = [
-  {
-    city: "PARIS RESIDENCE",
-    address: "14 Rue de la Paix, 75002 Paris, France",
-    phone: "+33 (0) 1 53 43 80 00",
-    hours: "10:00 - 18:00 CEST",
-    lat: 48.8688,
-    lng: 2.3312
-  },
-  {
-    city: "MILAN HEADQUARTERS",
-    address: "Via Monte Napoleone, 8, 20121 Milano, Italy",
-    phone: "+39 02 7600 8200",
-    hours: "09:30 - 18:30 CEST",
-    lat: 45.4682,
-    lng: 9.1952
-  }
-];
+const FALLBACK_STUDIO = {
+  city: "KOLKATA STUDIO",
+  address: "Kolkata, West Bengal, India",
+  phone: "+91 98300 00000",
+  hours: "10:00 - 18:00 IST",
+  lat: 48.8688,
+  lng: 2.3312
+};
 
 export default function Contact() {
-  const [activeStudioIdx, setActiveStudioIdx] = useState(0);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: ""
-  });
-  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [studio, setStudio] = useState<StudioSettings | typeof FALLBACK_STUDIO>(FALLBACK_STUDIO);
 
-  const activeStudio = STUDIOS[activeStudioIdx];
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) {
-      setStatus("error");
-      return;
-    }
-
-    setStatus("sending");
-    
-    // Simulate premium secure SMTP delay
-    setTimeout(() => {
-      setStatus("success");
-      setFormData({ name: "", email: "", subject: "", message: "" });
-    }, 1500);
-  };
+  useEffect(() => {
+    const fetchStudio = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "settings", "studio"));
+        if (docSnap.exists()) {
+          setStudio(docSnap.data() as StudioSettings);
+        }
+      } catch (error: any) {
+        if (error?.message && error.message.includes("offline")) {
+          console.warn("Studio settings offline, using defaults.");
+        } else {
+          console.error("Error fetching studio:", error);
+        }
+      }
+    };
+    fetchStudio();
+  }, []);
 
   return (
-    <section id="contact" className="relative py-24 md:py-36 bg-[#0B0B0B] overflow-hidden px-6 md:px-12 border-t border-white/5">
+    <section id="contact" className="relative py-24 md:py-36 bg-luxury-black overflow-hidden px-6 md:px-12 border-t border-white/5">
       {/* Background soft ambiance lights */}
       <div className="absolute top-1/2 left-[10%] w-[35rem] h-[35rem] bg-luxury-gold/3 rounded-full filter blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] 3xl:max-w-[1760px] mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10">
         
         {/* Core Big Call to Action */}
         <div className="text-center space-y-6 mb-20 md:mb-28">
@@ -95,117 +69,10 @@ export default function Contact() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
           
           {/* Column Left: Booking Form */}
-          <div className="lg:col-span-7 bg-[#111]/40 border border-white/5 rounded-[40px] p-8 md:p-12 relative overflow-hidden">
+          <div className="lg:col-span-7 bg-luxury-black/40 border border-white/5 rounded-[40px] p-8 md:p-12 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-luxury-gold/2 rounded-full filter blur-3xl pointer-events-none" />
 
-            <h3 className="font-display text-2xl font-bold uppercase text-luxury-cream mb-8">
-              SECURE SECRETS INQUIRY PORTAL
-            </h3>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label htmlFor="contact-name" className="text-[9px] font-mono tracking-widest text-zinc-500 uppercase block pl-1">
-                    Your Full Name *
-                  </label>
-                  <input
-                    id="contact-name"
-                    type="text"
-                    name="name"
-                    required
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Isabella Rossi"
-                    className="w-full bg-luxury-black border border-white/10 rounded-2xl p-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="contact-email" className="text-[9px] font-mono tracking-widest text-zinc-500 uppercase block pl-1">
-                    Email Address *
-                  </label>
-                  <input
-                    id="contact-email"
-                    type="email"
-                    name="email"
-                    required
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="e.g., mail@isabellarossi.com"
-                    className="w-full bg-luxury-black border border-white/10 rounded-2xl p-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="contact-subject" className="text-[9px] font-mono tracking-widest text-zinc-500 uppercase block pl-1">
-                  Campaign Subject Picker
-                </label>
-                <input
-                  id="contact-subject"
-                  type="text"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleInputChange}
-                  placeholder="e.g., Haute Couture Campaign 2026 Paris"
-                  className="w-full bg-luxury-black border border-white/10 rounded-2xl p-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label id="label-message" htmlFor="contact-message" className="text-[9px] font-mono tracking-widest text-zinc-500 uppercase block pl-1">
-                  Project Details / Artistic Scope *
-                </label>
-                <textarea
-                  id="contact-message"
-                  name="message"
-                  rows={5}
-                  required
-                  value={formData.message}
-                  onChange={handleInputChange}
-                  placeholder="Tell us about your creative requirements, scheduling scope, and target locations..."
-                  className="w-full bg-luxury-black border border-white/10 rounded-2xl p-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold transition-colors resize-none"
-                />
-              </div>
-
-              {/* Security confirmation / Status box */}
-              <AnimatePresence mode="wait">
-                {status === "success" && (
-                  <motion.div 
-                    className="p-4 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl flex items-center space-x-3"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <Send className="w-5 h-5 shrink-0 text-emerald-400" />
-                    <span>Inquiry secure: message transmitted successfully! Our agent squad will contact you in under 4 hours.</span>
-                  </motion.div>
-                )}
-                {status === "error" && (
-                  <motion.div 
-                    className="p-4 bg-rose-950/40 border border-rose-500/20 text-rose-400 text-xs rounded-2xl"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <span>Please ensure you have filled out all mandatory (*) parameters.</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Submit trigger button */}
-              <button
-                type="submit"
-                disabled={status === "sending"}
-                className="group w-full py-4 bg-luxury-gold text-luxury-black hover:bg-white font-display font-bold text-[11px] tracking-widest uppercase rounded-full transition-all duration-300 flex items-center justify-center space-x-3 shadow-lg shadow-luxury-gold/5 cursor-pointer"
-                id="contact-submit-btn"
-              >
-                <span>{status === "sending" ? "TRANSMITTING..." : "SECURE TRANSMIT MESSAGE"}</span>
-                <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-0.5 transition-transform" />
-              </button>
-
-            </form>
+            <WayficFormRenderer formId="contact" />
           </div>
 
           {/* Column Right: Interactive Radar Dark Map & Address */}
@@ -214,37 +81,19 @@ export default function Contact() {
             {/* Real Studio details card */}
             <div className="space-y-6">
               
-              {/* Studio Toggle selector tabs */}
-              <div className="flex bg-neutral-900 border border-white/5 rounded-full p-1 w-full justify-between">
-                {STUDIOS.map((st, sIdx) => (
-                  <button
-                    key={st.city}
-                    onClick={() => setActiveStudioIdx(sIdx)}
-                    className={`flex-1 py-3 text-[10px] font-mono tracking-widest uppercase rounded-full font-bold transition-all ${
-                      activeStudioIdx === sIdx
-                        ? "bg-[#1C1C1C] text-luxury-gold border border-white/5 shadow-md"
-                        : "text-zinc-500 hover:text-luxury-cream"
-                    }`}
-                    id={`studio-switch-${sIdx}`}
-                  >
-                    {st.city.split(" ")[0]} Studio
-                  </button>
-                ))}
-              </div>
-
               {/* Display active studio information details */}
               <motion.div
-                key={activeStudio.city}
+                key={studio.city}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5 }}
-                className="space-y-4 p-6 bg-[#111]/30 border border-white/5 rounded-[24px]"
+                className="space-y-4 p-6 bg-luxury-black/30 border border-white/5 rounded-[24px]"
               >
                 <div className="flex justify-between items-center pb-2 border-b border-white/5">
                   <span className="text-xs font-display font-extrabold text-luxury-cream tracking-wide">
-                    {activeStudio.city}
+                    {studio.city}
                   </span>
-                  <span className="px-2.5 py-0.5 bg-[#D4AF37]/10 text-luxury-gold rounded-full text-[8px] font-mono">
+                  <span className="px-2.5 py-0.5 bg-luxury-gold/10 text-luxury-gold rounded-full text-[8px] font-mono">
                     GLOBAL CENTER
                   </span>
                 </div>
@@ -252,15 +101,15 @@ export default function Contact() {
                 <div className="space-y-3 font-light text-zinc-400 text-xs">
                   <div className="flex items-start space-x-3.5">
                     <MapPin className="w-4.5 h-4.5 text-luxury-gold shrink-0 mt-0.5" />
-                    <span>{activeStudio.address}</span>
+                    <span>{studio.address}</span>
                   </div>
                   <div className="flex items-center space-x-3.5">
                     <Phone className="w-4.5 h-4.5 text-luxury-gold shrink-0" />
-                    <span>{activeStudio.phone}</span>
+                    <span>{studio.phone}</span>
                   </div>
                   <div className="flex items-center space-x-3.5">
                     <Clock className="w-4.5 h-4.5 text-luxury-gold shrink-0" />
-                    <span>Business Hours: {activeStudio.hours}</span>
+                    <span>Business Hours: {studio.hours}</span>
                   </div>
                 </div>
               </motion.div>
@@ -294,7 +143,7 @@ export default function Contact() {
                     ACTIVE SATELLITE RADAR BEACON
                   </span>
                   <span className="text-xs font-mono font-bold text-luxury-gold uppercase block">
-                    LAT: {activeStudio.lat}° N • LNG: {activeStudio.lng}° E
+                    LAT: {studio.lat}° N • LNG: {studio.lng}° E
                   </span>
                 </div>
 
@@ -304,7 +153,7 @@ export default function Contact() {
 
                 <div className="pt-2">
                   <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeStudio.address)}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(studio.address)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center space-x-1.5 text-[9px] font-mono tracking-widest text-luxury-cream hover:text-luxury-gold bg-white/5 hover:bg-white/10 px-4 py-2 border border-white/5 rounded-full transition-colors"

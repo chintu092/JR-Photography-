@@ -1,0 +1,443 @@
+{
+  "entities": {
+    "SiteSettings": {
+      "title": "Site Settings",
+      "description": "Global settings for the application",
+      "type": "object",
+      "properties": {
+        "logoUrl": {
+          "type": "string",
+          "description": "The URL of the site logo"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The last time the settings were updated"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "The UID of the user who last updated the settings"
+        }
+      },
+      "required": ["logoUrl", "updatedAt", "updatedBy"]
+    },
+    "SEOSettings": {
+      "title": "SEO Settings",
+      "description": "Search Engine Optimization settings for the site",
+      "type": "object",
+      "properties": {
+        "siteName": {
+          "type": "string",
+          "description": "Name of the website"
+        },
+        "defaultTitle": {
+          "type": "string",
+          "description": "Default title for pages"
+        },
+        "titleTemplate": {
+          "type": "string",
+          "description": "Template for page titles (e.g. %s | Site Name)"
+        },
+        "defaultDescription": {
+          "type": "string",
+          "description": "Default site description"
+        },
+        "canonicalUrl": {
+          "type": "string",
+          "description": "Base canonical URL"
+        },
+        "defaultOgImage": {
+          "type": "string",
+          "description": "Default Open Graph image URL"
+        },
+        "twitterHandle": {
+          "type": "string",
+          "description": "Twitter handle for meta tags"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string"
+        }
+      },
+      "required": ["siteName", "defaultTitle", "titleTemplate", "defaultDescription", "canonicalUrl", "defaultOgImage", "updatedAt", "updatedBy"]
+    },
+    "PageSEOSettings": {
+      "title": "Page SEO Settings",
+      "description": "Individual page SEO tuning parameters",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "focusKeyword": { "type": "string" },
+        "canonicalUrl": { "type": "string" },
+        "ogImageUrl": { "type": "string" },
+        "noIndex": { "type": "boolean" },
+        "slug": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["updatedAt", "updatedBy"]
+    },
+    "ThemeSettings": {
+      "title": "Theme Settings",
+      "description": "Visual identity and color protocols for the site",
+      "type": "object",
+      "properties": {
+        "gold": { "type": "string", "description": "Primary accent color (hex)" },
+        "black": { "type": "string", "description": "Deep background color (hex)" },
+        "cream": { "type": "string", "description": "High-contrast text color (hex)" },
+        "gray": { "type": "string", "description": "Secondary UI color (hex)" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["gold", "black", "cream", "gray", "updatedAt", "updatedBy"]
+    },
+    "StudioSettings": {
+      "title": "Studio Settings",
+      "description": "Information about the photography studio",
+      "type": "object",
+      "properties": {
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "hours": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["city", "address", "phone", "hours", "lat", "lng", "updatedAt", "updatedBy"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "A single portfolio project",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "description": { "type": "string" },
+        "year": { "type": "string" },
+        "client": { "type": "string" },
+        "role": { "type": "string" },
+        "beforeImage": { "type": "string" },
+        "afterImage": { "type": "string" },
+        "details": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "galleryImages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["title", "category", "image", "description", "year", "client", "role", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "BlogPost": {
+      "title": "Blog Post",
+      "description": "A single blog post",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "coverImage": { "type": "string" },
+        "readTime": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "quote": { "type": "string" },
+        "author": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "avatar": { "type": "string" },
+            "role": { "type": "string" }
+          },
+          "required": ["name", "avatar", "role"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["title", "summary", "content", "coverImage", "readTime", "date", "category", "author", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Information about an administrator",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The administrator's email address"
+        }
+      },
+      "required": ["email"]
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "A client testimonial or review",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "company": { "type": "string" },
+        "comment": { "type": "string" },
+        "avatar": { "type": "string" },
+        "rating": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["name", "role", "company", "comment", "avatar", "rating", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "A luxury architecture/service offering",
+      "type": "object",
+      "properties": {
+        "num": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "longDesc": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["num", "title", "description", "longDesc", "tags", "order", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "CommunitySettings": {
+      "title": "Community Settings",
+      "description": "Content for the community section",
+      "type": "object",
+      "properties": {
+        "titleHeader": { "type": "string" },
+        "subtitleHeader": { "type": "string" },
+        "body": { "type": "string" },
+        "joinLink": { "type": "string" },
+        "backgroundImage": { "type": "string" },
+        "imageURL": { "type": "string" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["titleHeader", "subtitleHeader", "body", "joinLink", "backgroundImage", "imageURL", "features", "updatedAt", "updatedBy"]
+    },
+    "ContactSubmission": {
+      "title": "Contact Submission",
+      "description": "Form submissions from potential clients",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["New", "Replied", "Pending"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "message", "status", "createdAt"]
+    },
+    "AnalyticsSettings": {
+      "title": "Analytics Settings",
+      "description": "Visual details and page analytics metrics",
+      "type": "object",
+      "properties": {
+        "pageViews": { "type": "number" },
+        "uniqueVisitors": { "type": "number" },
+        "trafficData": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "visits": { "type": "number" }
+            }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": "number" },
+              "color": { "type": "string" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["pageViews", "uniqueVisitors", "trafficData", "sources", "updatedAt"]
+    },
+    "WhatsAppClick": {
+      "title": "WhatsApp Click",
+      "description": "Records of whatsapp button clicks for analytics",
+      "type": "object",
+      "properties": {
+        "clickedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clickedAt"]
+    },
+    "Subscriber": {
+      "title": "Subscriber",
+      "description": "Newsletter subscribers collected from footer signup",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Email address of subscriber" },
+        "subscribedAt": { "type": "string", "format": "date-time", "description": "The date and time the user subscribed" }
+      },
+      "required": ["email", "subscribedAt"]
+    },
+    "WayficForm": {
+      "title": "Wayfic Form",
+      "description": "Custom managed forms builder like Contact Form 7",
+      "type": "object",
+      "properties": {
+        "formId": { "type": "string" },
+        "title": { "type": "string" },
+        "fields": { "type": "array" },
+        "mailto": { "type": "string" },
+        "emailTemplateId": { "type": "string" },
+        "successMessage": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["formId", "title", "fields", "createdAt"]
+    },
+    "WayficSubmission": {
+      "title": "Wayfic Submission",
+      "description": "Dynamic contact submissions recorded across custom forms",
+      "type": "object",
+      "properties": {
+        "formId": { "type": "string" },
+        "formTitle": { "type": "string" },
+        "data": { "type": "object" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["formId", "data", "createdAt"]
+    },
+    "PricingPlan": {
+      "title": "Pricing Plan",
+      "description": "Dynamic pricing tier configurations",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "string" },
+        "description": { "type": "string" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "highlight": { "type": "boolean" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "duration": { "type": "string" },
+        "stylePreset": { "type": "string", "enum": ["p1", "p2", "p3"] },
+        "order": { "type": "number" },
+        "active": { "type": "boolean" },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "string" },
+              "duration": { "type": "string" },
+              "description": { "type": "string" }
+            },
+            "required": ["id", "name", "price", "duration", "description"]
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["name", "price", "description", "features", "highlight", "tags", "order", "createdAt", "updatedAt", "updatedBy"]
+    }
+  },
+  "firestore": {
+    "/pricing_plans/{planId}": {
+      "schema": "PricingPlan",
+      "description": "Dynamic pricing plans configuration"
+    },
+    "/settings/general": {
+      "schema": "SiteSettings",
+      "description": "General settings for the site"
+    },
+    "/settings/seo": {
+      "schema": "SEOSettings",
+      "description": "SEO settings for the site"
+    },
+    "/settings/seo/pages/{pageId}": {
+      "schema": "PageSEOSettings",
+      "description": "Individual page specific SEO settings"
+    },
+    "/settings/theme": {
+      "schema": "ThemeSettings",
+      "description": "Visual theme settings for the site"
+    },
+    "/settings/studio": {
+      "schema": "StudioSettings",
+      "description": "Photography studio location and contact details"
+    },
+    "/settings/community": {
+      "schema": "CommunitySettings",
+      "description": "Content for the community section"
+    },
+    "/portfolio/{itemId}": {
+      "schema": "PortfolioItem",
+      "description": "Individual portfolio items"
+    },
+    "/blog/{postId}": {
+      "schema": "BlogPost",
+      "description": "Individual blog posts"
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": "Testimonial",
+      "description": "Client testimonials"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Luxury architecture offerings"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "List of administrators"
+    },
+    "/contacts/{contactId}": {
+      "schema": "ContactSubmission",
+      "description": "Records of contact form submissions"
+    },
+    "/settings/analytics": {
+      "schema": "AnalyticsSettings",
+      "description": "Analytics data for page views and unique visitors"
+    },
+    "/whatsapp_clicks/{clickId}": {
+      "schema": "WhatsAppClick",
+      "description": "Analytics data for whatsapp floating icon clicks"
+    },
+    "/subscribers/{subscriberId}": {
+      "schema": "Subscriber",
+      "description": "Newsletter subscribers collected from the footer"
+    },
+    "/wayfic_forms/{formId}": {
+      "schema": "WayficForm",
+      "description": "Custom managed contact/booking forms definitions"
+    },
+    "/wayfic_submissions/{submissionId}": {
+      "schema": "WayficSubmission",
+      "description": "Submissions collected via custom dynamic forms"
+    }
+  }
+}

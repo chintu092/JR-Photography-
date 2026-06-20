@@ -13,51 +13,51 @@ export const BRAND_LOGOS = [
 export const SERVICES: Service[] = [
   {
     id: "s1",
-    title: "Fashion & Editorial",
+    title: "Bengali & Luxury Wedding",
     num: "01",
-    description: "Avant-garde haute couture lighting and dynamic compositions for high-end fashion lines and magazine covers.",
-    longDesc: "Our haute couture fashion coverage brings cinematic drama and elite visual poetry to designer collections, editorials, and branding initiatives. We leverage customized hard-shadow studio frameworks and epic real-life scenery.",
-    tags: ["High Fashion", "Runway Editorial", "Studio Casting", "Hard Contour Lighting"]
+    description: "Award-winning traditional and luxury Bengali wedding photography across Kolkata, capturing pristine cultural rituals.",
+    longDesc: "As the Best Wedding Photographer in Kolkata, our luxury wedding coverage brings cinematic drama and elite visual poetry to traditional Bengali rituals, Mehendi, Sangeet, and grand reception ceremonies. We capture every pristine cultural detail with utmost care.",
+    tags: ["Bengali Wedding Photography", "Luxury Weddings", "Kolkata Venues", "Cultural Rituals"]
   },
   {
     id: "s2",
-    title: "Luxury Wedding",
+    title: "Candid Wedding Photography",
     num: "02",
-    description: "Documentary and fine-art style coverage capturing emotional elegance, grand estates, and intimate celebration.",
-    longDesc: "Tailored for high-profile celebrations and luxury weddings worldwide. We capture candid emotions and scenic backdrops utilizing state-of-the-art medium format lenses to ensure heirloom physical printing quality.",
-    tags: ["Destination Weddings", "Fine Art Candid", "Medium Format Portraits", "Dusk Sessions"]
+    description: "Documentary and fine-art style candid coverage capturing emotional elegance and intimate celebrations.",
+    longDesc: "Our team of the best candid wedding photographers in Kolkata frames every moment of your special day with utmost care. Tailored for high-profile celebrations, we capture candid emotions and fleeting smiles utilizing state-of-the-art lenses.",
+    tags: ["Candid Wedding", "Fine Art Photojournalism", "Emotional Portraits", "Kolkata Weddings"]
   },
   {
     id: "s3",
-    title: "Commercial Campaigns",
+    title: "Pre-Wedding Photography",
     num: "03",
-    description: "Aesthetic storytelling and premium commercial visual assets designed to build unstoppable luxury brand status.",
-    longDesc: "We produce visual media that elevates architectural, luxury automotive, design-focused products, and tech clients. Focused on clean minimalism, tactile details, and rich color theory.",
-    tags: ["Product Launches", "Brand Epics", "Luxury Automotive", "Billboard High-res"]
+    description: "Aesthetic storytelling and premium pre-wedding photoshoots designed to capture the unique chemistry of couples.",
+    longDesc: "We produce visual media that elevates your pre-wedding story. Focused on cinematic storytelling, vintage shots, and beautiful scenic backdrops across Kolkata's finest locations and destinations.",
+    tags: ["Pre-Wedding Photography", "Kolkata Destinations", "Cinematic Storytelling", "Theme Shots"]
   },
   {
     id: "s4",
-    title: "Cinematic Videography",
+    title: "Cinematic Wedding Films",
     num: "04",
-    description: "Immersive high-fidelity 4K or 8K commercial films, narrative storytelling, and aesthetic campaign reels.",
-    longDesc: "Moving portraits and highly stylized film coverage. Using Hollywood-certified camera systems, custom LUT color pipelines, and sophisticated sound design presets.",
-    tags: ["Aesthetic Moodfilms", "Commercial Ads", "Haute Runway Reels", "4K HDR Masterwork"]
+    description: "Immersive high-fidelity 4K commercial wedding films, narrative storytelling, and aesthetic campaign reels.",
+    longDesc: "Grand, Creative & Unique Wedding Films. Moving portraits and highly stylized film coverage using Hollywood-certified camera systems and sophisticated sound design to weave the pictures magically to create value for a lifetime.",
+    tags: ["Wedding Films", "Aesthetic Moodfilms", "4K HDR Masterwork", "Cinematic Storytelling"]
   },
   {
     id: "s5",
-    title: "Drone & Aerials",
+    title: "Maternity & Baby Photography",
     num: "05",
-    description: "Expansive landscape perspectives and architectural scale captured from breathtaking high-elevation views.",
-    longDesc: "Using ultra-high resolution cinematic drones. We provide beautiful spatial mapping, majestic scenic backdrops, and majestic panning shots for elite properties and locations.",
-    tags: ["Aerial Panoramas", "Elite Real Estate", "Landscape Scaling", "Licensed Operators"]
+    description: "Expansive emotional perspectives capturing the beauty of maternity and newborn milestones.",
+    longDesc: "Using ultra-high resolution lenses, we provide beautiful, delicate, and caring photoshoots for maternity, baby arrivals, and Rice Ceremony photography in Kolkata, cherishing life's beautiful beginnings.",
+    tags: ["Maternity Photography", "Baby Photoshoot", "Rice Ceremony", "Kolkata"]
   },
   {
     id: "s6",
-    title: "High-End Event Coverage",
+    title: "Destination Wedding Coverage",
     num: "06",
-    description: "Exclusive red carpet galas, luxury exhibitions, premier art summits, and runway after-parties.",
-    longDesc: "Discreet and elegant live coverage. We translate fast-moving premium social spectacles into pristine documentary photography ready for instant press distribution.",
-    tags: ["Private Galas", "Art Exhibitions", "PR Distribution", "High Society Documentaries"]
+    description: "Exclusive destination wedding galas, operating all over India with our award-winning aesthetic.",
+    longDesc: "Rigorous and elegant live coverage for destination weddings in Patna and across India. We translate fast-moving premium social spectacles into pristine documentary photography ready for instant physical printing.",
+    tags: ["Destination Weddings", "Patna Wedding Photography", "All Over India", "High Society Documentaries"]
   }
 ];
 
@@ -67,6 +67,7 @@ export const WORK_ITEMS: WorkItem[] = [
     title: "La Parisienne Couture",
     category: "Fashion",
     image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1200",
+    imageAlt: "Avant-garde dark autumn haute couture editorial",
     description: "An avant-garde dark autumn haute couture editorial filmed on the limestone cliffs of Étretat, France.",
     year: "2025",
     client: "Vogue France",
@@ -89,6 +90,7 @@ export const WORK_ITEMS: WorkItem[] = [
     title: "The Como Promise",
     category: "Wedding",
     image: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200",
+    imageAlt: "Private wedding at Villa Balbiano, Lake Como",
     description: "A three-day ultra-luxury intimate destination wedding set along the romantic horizons of Villa d'Este.",
     year: "2026",
     client: "The Sterling Family",
@@ -110,6 +112,7 @@ export const WORK_ITEMS: WorkItem[] = [
     title: "Sculpting the Hour",
     category: "Commercial",
     image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=1200",
+    imageAlt: "Luxury horological product capture for Vacheron Constantin",
     description: "Atmospheric minimalist product launch for an iconic Swiss gold timepiece showing liquid micro-dynamics.",
     year: "2025",
     client: "Aethelgard Swiss",
@@ -131,6 +134,7 @@ export const WORK_ITEMS: WorkItem[] = [
     title: "Shadows of Amalfi",
     category: "Lifestyle",
     image: "https://images.unsplash.com/photo-1488161628813-04466f872be2?auto=format&fit=crop&q=80&w=1200",
+    imageAlt: "Vintage maritime lifestyle photoshoot on the Amalfi Coast",
     description: "Moody black-and-white lifestyle chronicle tracking an Italian sculptor's creative flow in her coastal sanctuary.",
     year: "2026",
     client: "Artisan Living Guild",
@@ -152,6 +156,7 @@ export const WORK_ITEMS: WorkItem[] = [
     title: "The Silent Speedster",
     category: "Commercial",
     image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200",
+    imageAlt: "High intensity automotive shoot for Porsche Taycan Turbo S",
     description: "Atmospheric evening launch photography for a conceptual high-performance electric hypercar.",
     year: "2025",
     client: "Valkyrie Motors",
@@ -173,6 +178,7 @@ export const WORK_ITEMS: WorkItem[] = [
     title: "Symphony of Silk",
     category: "Fashion",
     image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=1200",
+    imageAlt: "Close-up color graded photographic fashion details of silk",
     description: "Flowing physical geometries captured using continuous slow-shutter strobe flashes in Florence, Italy.",
     year: "2026",
     client: "Maison de L'Étoile",
@@ -340,59 +346,64 @@ export const FAQS: FaqItem[] = [
   {
     id: "f1",
     question: "Where is JR Photography based, and do you travel?",
-    answer: "Our creative agency is headquartered in Paris, France and Milan, Italy. However, over 80% of our premium portfolio is captured worldwide. We maintain an in-house global travel logistics team to safely dispatch equipment and talent to any remote landscape, city, or private island."
+    answer: "We are proudly based in Kolkata, but operating all over India. We travel extensively for destination weddings across cities like Patna, Bhubaneswar, Delhi, and beyond to capture your special day, no matter the location."
   },
   {
     id: "f2",
-    question: "Which equipment does the agency use?",
-    answer: "We shoot primarily with Hasselblad H6D-100c and Phase One IQ4 medium format cameras for unmatched raw resolution and dynamic value. For high-velocity fashion of moving spectacles, we use Leica M11 / SL2. Our cinematic films are captured using Arri Alexa Mini LF systems with Master Anamorphic prime glass."
+    question: "How much does a wedding photographer cost in Kolkata?",
+    answer: "The cost depends on various factors: the number of days, the scale of the event, and the specific services (Candid, Traditional, Cinematic Video). Generally, premium photography starts at moderate pricing but varies based on your unique customized package."
   },
   {
     id: "f3",
-    question: "What is your typical post-production delivery timeline?",
-    answer: "Because our color grading and physical proofing processes are done by hand-craft specialists, the standard delivery is 4 to 6 weeks. However, we deliver a curated set of 8 premium 'Next-Day Teasers' within 24 hours of production for immediate social/PR applications."
+    question: "What is the cost of your photography packages?",
+    answer: "Our photography packages are fully tailored. We offer options ranging from simple pre-wedding shoots to comprehensive multi-day luxury Bengali wedding coverage. Please reach out to our team with your dates and event details for an accurate quote."
   },
   {
     id: "f4",
-    question: "Can we request custom hand-pressed print books?",
-    answer: "Yes, visual longevity is our primary philosophy. We collaborate with master bookbinders in Munich and Florence to produce leather, velvet, and organic linen-bound archives. We print on certified matte archival museum papers that protect colors for over 200 years."
+    question: "Is 500 photos enough for a wedding?",
+    answer: "Yes, 500 beautifully curated and hand-edited images are perfectly sufficient to tell the complete narrative of your wedding. Focusing on quality over quantity ensures every final picture is a cinematic showpiece."
+  },
+  {
+    id: "f5",
+    question: "Where is the best place to shoot a pre-wedding in Kolkata?",
+    answer: "Kolkata offers stunning backdrops, from the vintage aesthetics of North Kolkata streets and the Hooghly riverbanks at Princep Ghat, to eco-parks and luxurious resorts. We customize the location based on the theme you envision."
   }
 ];
 
 export const BLOG_POSTS: BlogPost[] = [
   {
     id: "b1",
-    title: "Chasing Shadows: The Physics of Hard Strobe Editorial",
-    summary: "Discover how the strategic use of high-contrast contour strobe lighting can turn standard fashion portraits into dramatic, sculptural masterpieces.",
-    category: "Lighting Dynamics",
-    coverImage: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1200",
+    title: "Pre-Wedding and Wedding Photoshoots in Kolkata: Latest Trends",
+    summary: "From Cinematic storytelling to Vintage Bollywood Looks, explore the top trending wedding photography ideas sweeping across Kolkata this season.",
+    category: "Wedding Trends",
+    coverImage: "https://images.unsplash.com/photo-1542044801-645ff72d5b6e?auto=format&fit=crop&q=80&w=1200",
     readTime: "6 min read",
-    date: "May 25, 2026",
-    quote: "Contrast is not just the difference between light and dark; it is the boundary where a photograph gains its soul.",
+    date: "June 05, 2026",
+    quote: "A wedding is not just an event; it's a cinematic story waiting to be told through the lens.",
     content: [
-      "In modern luxury fashion campaigns, the pursuit of softness has sometimes led to a loss of character. When every face is evenly illuminated with massive softboxes, we lose the topographical narrative that makes human features so fascinating. To subvert this, our studio has returned to the stark beauty of hard strobes.",
-      "By utilizing structured reflectors and open-bulb flashes, we carve deep, dramatic contours. This technique, heavily popularized by mid-century Parisian magazine editorials, relies on absolute precision. A shift of just two centimeters in the strobe position can make the difference between an elegant jawline shadow and an unwanted facial obstruction.",
-      "To tame this high-contrast method, we use subtle ambient silver reflectors that bounce back just enough fill light to preserve delicate textures without diluting the primary direction. The result is a sculptural three-dimensionality that commands attention on large billboards and high-density digital displays."
+      "The wedding photography scene in Kolkata is constantly evolving. Today's couples are moving away from traditional, stiff poses and leaning heavily into authentic, narrative-driven experiences. The priority now is to capture the raw vibe of the celebration.",
+      "One of the biggest trends is Cinematic Storytelling. Instead of random video clips, modern wedding films employ narrative arcs, utilizing voice-overs from the vows or heartfelt speeches from parents to create an emotionally resonant, documentary-style film.",
+      "Another rising trend is the 'Vintage Bollywood Look' during pre-wedding shoots. Utilizing the historic architectures of North Kolkata or classic yellow taxis, couples are reenacting dramatic, nostalgic aesthetics with sepia-toned or deep contrast color palettes."
     ],
     author: {
-      name: "Estelle Vancamp",
+      name: "JR Team",
       avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100",
-      role: "Lead Fashion Photographer"
+      role: "Lead Photographer"
     }
   },
   {
     id: "b2",
-    title: "The Medium Format Manifesto: Why Pixels Alone are Not Enough",
-    summary: "An exploration of scale, transition gradient, and compression space, detailing why 100-megapixel sensors provide unmatched editorial character.",
-    category: "Technical Craft",
-    coverImage: "https://images.unsplash.com/photo-1488161628813-04466f872be2?auto=format&fit=crop&q=80&w=1200",
+    title: "Things to Remember While Hiring the Best Wedding Photographer in Kolkata",
+    summary: "Expert advice on balancing budget, reviewing portfolios, and establishing rapport to find the perfect photography team for your big day.",
+    category: "Planning",
+    coverImage: "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?auto=format&fit=crop&q=80&w=1200",
     readTime: "8 min read",
     date: "April 18, 2026",
-    quote: "A sensor does not merely count light; it interprets space. Medium format lens dynamics create a transition speed that flat digital files cannot copy.",
+    quote: "Your wedding photographs are the only investment from your wedding day that actually increases in value over time.",
     content: [
-      "In the commercial landscape, we often hear debates centered entirely around megapixel count. But resolution is merely a side benefit of true medium format photography. The real magic lies in three key elements: spatial compression, light transition speeds, and dynamic range depth.",
-      "Because Hasselblad and Phase One sensors are physically larger than standard full-frame DSLRs, they utilize lenses with longer focal lengths to achieve the same field of view. This introduces a subtle, breathtaking compression that gently detaches the subject from the background, creating a genuine three-dimensional look that feels immersive.",
-      "Furthermore, the roll-off from highlight to shadow happens with a luxurious gradation. Rather than hitting an abrupt digital ceiling where highlights clip, medium format preserves detail well into the white channels. This makes it the definitive medium for luxury landscape couture, architectural captures, and legacy wedding portfolios."
+      "Hiring the best wedding photographer in Kolkata is arguably one of the most critical decisions you will make during your wedding planning. It's not just about pointing a camera; it's about trusting someone with your most precious, unrepeatable moments.",
+      "First, do proper research. Beyond just scrolling Instagram feeds, ask to see full, delivered wedding albums. This reveals consistency across an entire 12-hour day, not just the single best sunset shot.",
+      "Consider the budget realistically. The cost of a wedding photographer in Kolkata varies based on team size, equipment, and expertise. High-quality cinematic videos and candid documentary photography require seasoned artistic professionals. Finally, always arrange a physical meeting or video call. If your personalities do not genuinely click, it will show on camera. You want a team that feels like an extension of your family."
     ],
     author: {
       name: "Jayanta Roy",
