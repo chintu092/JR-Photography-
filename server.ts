@@ -22,7 +22,13 @@ async function startServer() {
   let adminDbInstance: any = null;
   let firebaseClientConfig: any = null;
   try {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    let configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (!fs.existsSync(configPath)) {
+      configPath = path.join(__dirname, "..", "firebase-applet-config.json");
+    }
+    if (!fs.existsSync(configPath)) {
+      configPath = path.join(__dirname, "firebase-applet-config.json");
+    }
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       firebaseClientConfig = config;
@@ -1925,11 +1931,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  // Only listen in standalone environments, not inside Vercel serverless
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
+
+  return app;
 }
 
-startServer().catch((err) => {
+export const appPromise = startServer();
+appPromise.catch((err) => {
   console.error("Failed to start server:", err);
 });

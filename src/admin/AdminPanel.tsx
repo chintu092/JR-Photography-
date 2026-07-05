@@ -270,7 +270,11 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     if (user && user.isCustomAuth) {
-      setPasscodeVerified(true);
+      if (user.uid && user.uid.startsWith('google_oauth_')) {
+        setPasscodeVerified(false);
+      } else {
+        setPasscodeVerified(true);
+      }
     } else {
       setPasscodeVerified(false);
     }
@@ -306,9 +310,20 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
 
       console.log("[Verification Debug] Entered:", passcode, "| Calculated Code:", dbPasscode);
 
-      const isMatch = passcode === dbPasscode || passcode === defaultPasscode;
-      if (isMatch) {
+      const isMatch = !passcodeVerified && (passcode === dbPasscode || passcode === defaultPasscode);
+      
+      let totpMatch = false;
+      if (!isMatch && hasTwoFactor && twoFactorSecret) {
+        try {
+          totpMatch = await verifyTOTP(twoFactorSecret, passcode);
+        } catch (totpErr) {
+          console.error("TOTP verification error:", totpErr);
+        }
+      }
+
+      if (isMatch || totpMatch) {
         setPasscodeVerified(true);
+        setTwoFactorVerified(true);
         setPasscodeError(false);
       } else {
         setPasscodeError(true);
@@ -317,8 +332,11 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     } catch (err) {
       console.error("Error retrieving passcode from database, falling back to local environment credential:", err);
       const REQUIRED_PASSCODE = (import.meta as any).env.VITE_ADMIN_PASSCODE || "2026";
-      if (passcode === REQUIRED_PASSCODE) {
+      const isMatch = !passcodeVerified && passcode === REQUIRED_PASSCODE;
+      
+      if (isMatch) {
         setPasscodeVerified(true);
+        setTwoFactorVerified(true);
         setPasscodeError(false);
       } else {
         setPasscodeError(true);
@@ -342,11 +360,6 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
   const [setupCode, setSetupCode] = useState("");
   const [setupError, setSetupError] = useState("");
   const [setupLoading, setSetupLoading] = useState(false);
-
-  // Active 2FA login challenge code
-  const [totpChallengeCode, setTotpChallengeCode] = useState("");
-  const [totpChallengeError, setTotpChallengeError] = useState("");
-  const [verifyingTotpChallenge, setVerifyingTotpChallenge] = useState(false);
 
   // Load 2FA configuration from Firestore for the logged-in administrator
   useEffect(() => {
@@ -505,31 +518,6 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
       setSetupError("Failed to deactivate: " + err.message);
     } finally {
       setSetupLoading(false);
-    }
-  };
-
-  const handleTOTPChallengeSubmit = async (e: any) => {
-    e.preventDefault();
-    if (!twoFactorSecret) {
-      setTotpChallengeError("Your security configuration is invalid. Please contact Super Admin.");
-      return;
-    }
-    setVerifyingTotpChallenge(true);
-    setTotpChallengeError("");
-    try {
-      const isValid = await verifyTOTP(twoFactorSecret, totpChallengeCode);
-      if (isValid) {
-        setTwoFactorVerified(true);
-        toast.success("Authentication succeeded! Welcome to the panel.");
-      } else {
-        setTotpChallengeError("Incorrect authenticator code. Please check your Google Authenticator app.");
-        setTotpChallengeCode("");
-      }
-    } catch (err: any) {
-      console.error("TOTP verification error:", err);
-      setTotpChallengeError("Verification failed: " + err.message);
-    } finally {
-      setVerifyingTotpChallenge(false);
     }
   };
 
@@ -775,7 +763,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     );
   }
 
-  if (!passcodeVerified) {
+  if (!passcodeVerified || (!twoFactorVerified && hasTwoFactor)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-luxury-black text-luxury-cream p-4 sm:p-6">
         <motion.div 
@@ -789,22 +777,24 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-serif text-luxury-gold tracking-tight">Security Passcode</h1>
-            <p className="text-luxury-cream/60 font-sans uppercase tracking-widest text-[10px]">Additional verification required</p>
+            <h1 className="text-2xl font-serif text-luxury-gold tracking-tight">Security Verification</h1>
+            <p className="text-luxury-cream/60 font-sans uppercase tracking-widest text-[10px]">
+              Passcode / 6-digit Code
+            </p>
           </div>
           
           <form onSubmit={handlePasscodeSubmit} className="space-y-6">
             <div className="space-y-2">
               <input
-                type="password"
+                type={passcodeVerified ? "text" : "password"}
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter Passcode"
+                placeholder="Passcode / 6-digit Code"
                 className={`w-full bg-[#0a0910] border ${passcodeError ? 'border-red-500/50' : 'border-white/10'} rounded-xl px-4 py-3 text-center text-xl text-luxury-cream focus:outline-none focus:border-luxury-gold/40 tracking-[0.5em] font-mono`}
                 autoFocus
               />
               {passcodeError && (
-                <p className="text-red-400 text-[10px] uppercase tracking-widest">Incorrect passcode</p>
+                <p className="text-red-400 text-[10px] uppercase tracking-widest">Incorrect verification code</p>
               )}
             </div>
             <button
@@ -816,67 +806,6 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               <span>Verify Identity</span>
             </button>
           </form>
-
-          <button
-            onClick={logout}
-            className="w-full py-2 text-luxury-cream/40 hover:text-luxury-cream transition-colors duration-300 font-sans tracking-widest uppercase text-[10px]"
-          >
-            ← Sign Out & Return
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (!twoFactorVerified) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-luxury-black text-luxury-cream p-4 sm:p-6 text-left">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full text-center space-y-8 bg-luxury-black/50 p-8 sm:p-12 border border-luxury-gold/20 rounded-2xl backdrop-blur-xl"
-        >
-          <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
-              <ShieldCheck className="w-8 h-8 text-emerald-400" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-serif text-luxury-gold tracking-tight">Google Authenticator</h1>
-            <p className="text-luxury-cream/60 font-sans uppercase tracking-widest text-[10px]">Two-factor verification (MFA) required</p>
-          </div>
-          
-          <form onSubmit={handleTOTPChallengeSubmit} className="space-y-6">
-            <div className="space-y-3">
-              <p className="text-xs text-luxury-cream/60 leading-relaxed text-center">
-                Please enter the 6-digit verification code generated by your **Google Authenticator** app.
-              </p>
-              <input
-                type="text"
-                pattern="[0-9]*"
-                inputMode="numeric"
-                maxLength={6}
-                value={totpChallengeCode}
-                onChange={(e) => setTotpChallengeCode(e.target.value)}
-                placeholder="000000"
-                className={`w-full bg-[#0a0910] border ${totpChallengeError ? 'border-red-500/50' : 'border-white/10'} rounded-xl px-4 py-3 text-center text-2xl text-luxury-cream focus:outline-none focus:border-luxury-gold/40 tracking-[0.4em] font-mono`}
-                autoFocus
-                required
-              />
-              {totpChallengeError && (
-                <p className="text-red-400 text-center text-[10px] uppercase tracking-widest font-semibold">{totpChallengeError}</p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={verifyingTotpChallenge}
-              className="w-full py-3.5 bg-luxury-gold text-luxury-black font-semibold rounded-xl hover:bg-luxury-cream transition-colors duration-500 font-sans tracking-widest uppercase text-xs flex items-center justify-center gap-2"
-            >
-              {verifyingTotpChallenge ? <Loader2 className="w-4 h-4 animate-spin text-luxury-black" /> : null}
-              <span>{verifyingTotpChallenge ? "Verifying..." : "Verify 2FA Token"}</span>
-            </button>
-          </form>
-
           <button
             onClick={logout}
             className="w-full py-2 text-luxury-cream/40 hover:text-luxury-cream transition-colors duration-300 font-sans tracking-widest uppercase text-[10px]"
