@@ -1,13 +1,10 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc as fsDoc, getDoc as fsGetDoc, setDoc as fsSetDoc } from "firebase/firestore";
 import fs from "fs";
-import { initializeApp as initAdminApp, getApps as getAdminApps, getApp as getAdminApp } from "firebase-admin/app";
-import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 
 // Load environment configurations
 dotenv.config();
@@ -19,7 +16,7 @@ async function startServer() {
 
   // Initialize secure server-side Firebase Client
   let dbInstance: any = null;
-  let adminDbInstance: any = null;
+  let adminDbInstance: any = null; // Kept for backwards compatibility but not populated
   let firebaseClientConfig: any = null;
   try {
     let configPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -35,14 +32,6 @@ async function startServer() {
       const firebaseApp = initializeApp(config, "server-app-unique");
       dbInstance = getFirestore(firebaseApp, config.firestoreDatabaseId);
       console.log("[Firebase Server Setup] Server-side Firestore client fully constructed!");
-
-      if (getAdminApps().length === 0) {
-        initAdminApp({
-          projectId: config.projectId,
-        });
-      }
-      adminDbInstance = getAdminFirestore(getAdminApp(), config.firestoreDatabaseId || "(default)");
-      console.log("[Firebase Server Setup] Server-side Firestore Admin SDK fully constructed!");
     }
   } catch (error) {
     console.error("[Firebase Server Setup] Failed to build Firestore reference:", error);
@@ -822,7 +811,7 @@ async function startServer() {
     }
     
     if (!origin) {
-      const rawHost = req.headers["x-forwarded-host"] || req.get("host") || "";
+      const rawHost = req.headers["x-forwarded-host"] || req.headers["host"] || "";
       const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
       const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
       const rawProto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
@@ -838,41 +827,41 @@ async function startServer() {
 
   // Handle Google OAuth Callback
   const handleGoogleCallback = async (req: any, res: any) => {
-    const { code, state } = req.query;
-    if (!code) {
-      return res.redirect("/admin?oauth_error=no_code_provided");
-    }
-    const rawClientId = process.env.VITE_GOOGLE_CLIENT_ID;
-    const clientId = rawClientId ? rawClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "") : "";
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    
-    // Resolve origin from Google's redirect 'state' query parameter
-    let origin = "";
-    if (state) {
-      try {
-        const decodedState = decodeURIComponent(state as string);
-        if (decodedState.startsWith("http://") || decodedState.startsWith("https://")) {
-          origin = new URL(decodedState).origin;
-        }
-      } catch (e) {
-        console.warn("[OAuth Handshake] Failed to parse origin from state:", e);
-      }
-    }
-
-    // Fallback if state is missing or invalid
-    if (!origin) {
-      const rawHost = req.headers["x-forwarded-host"] || req.get("host") || "";
-      const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
-      const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
-      const rawProto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
-      const proto = Array.isArray(rawProto) ? rawProto[0] : rawProto;
-      origin = `${proto}://${host}`;
-    }
-
-    const callbackPath = origin.includes("vercel.app") ? "/api/auth/callback/google" : "/api/auth/google/callback";
-    const redirectUri = `${origin}${callbackPath}`;
-    
     try {
+      const { code, state } = req.query || {};
+      if (!code) {
+        return res.redirect("/admin?oauth_error=no_code_provided");
+      }
+      const rawClientId = process.env.VITE_GOOGLE_CLIENT_ID;
+      const clientId = rawClientId ? rawClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "") : "";
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      
+      // Resolve origin from Google's redirect 'state' query parameter
+      let origin = "";
+      if (state) {
+        try {
+          const decodedState = decodeURIComponent(state as string);
+          if (decodedState.startsWith("http://") || decodedState.startsWith("https://")) {
+            origin = new URL(decodedState).origin;
+          }
+        } catch (e) {
+          console.warn("[OAuth Handshake] Failed to parse origin from state:", e);
+        }
+      }
+
+      // Fallback if state is missing or invalid
+      if (!origin) {
+        const rawHost = req.headers["x-forwarded-host"] || req.headers["host"] || "";
+        const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+        const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
+        const rawProto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
+        const proto = Array.isArray(rawProto) ? rawProto[0] : rawProto;
+        origin = `${proto}://${host}`;
+      }
+
+      const callbackPath = origin.includes("vercel.app") ? "/api/auth/callback/google" : "/api/auth/google/callback";
+      const redirectUri = `${origin}${callbackPath}`;
+      
       // Exchange authorization code for tokens
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -938,7 +927,7 @@ async function startServer() {
               permissions: ['blog'],
               approved: false,
               addedAt: new Date().toISOString(),
-              addedBy: 'self_registration_independent_google'
+              addedBy: 'self_registration_google'
             };
           }
           
@@ -946,6 +935,20 @@ async function startServer() {
           await fsSetDoc(adminDocRef, matchedAdmin, { merge: true });
         } catch (dbErr) {
           console.error("[OAuth Handshake] Failed to fetch/create admin doc in Firestore Web SDK:", dbErr);
+          // If we failed to write due to permission denied, we still want to log them in locally with the read data or fallback data
+        }
+      }
+
+      if (!matchedAdmin) {
+        // Fallback if dbInstance failed entirely before matchedAdmin could be built
+        try {
+           const restData = await fetchFirestoreDocumentRest("admins", email);
+           if (restData) {
+             matchedAdmin = restData;
+             if (picture) matchedAdmin.picture = picture;
+           }
+        } catch(restErr) {
+           console.error("[OAuth Handshake] Fallback REST fetch failed", restErr);
         }
       }
 
@@ -1694,12 +1697,11 @@ async function startServer() {
       });
     }
   });
-
   // General Wayfic Mail Dispatcher
   app.post("/api/mail/send", async (req: any, res: any) => {
     const { formId, formData, mailSubject, mailBody, customRecipient } = req.body;
 
-    if (!dbInstance && !adminDbInstance) {
+    if (!dbInstance) {
       return res.status(500).json({ success: false, message: "Server-side Database connection not configured." });
     }
 
@@ -1716,19 +1718,7 @@ async function startServer() {
         try {
           let formConfig: any = null;
           
-          // 1. Try Admin SDK first
-          if (adminDbInstance) {
-            try {
-              const formSnap = await adminDbInstance.collection("wayfic_forms").doc(formId).get();
-              if (formSnap.exists) {
-                formConfig = formSnap.data();
-              }
-            } catch (adminErr: any) {
-              console.log("[Wayfic Mailer] Admin SDK wayfic_forms lookup skipped (using fallback).");
-            }
-          }
-
-          // 2. Try REST API fallback if Admin SDK failed or didn't run
+          // 1. Try REST API
           if (!formConfig && firebaseClientConfig) {
             try {
               formConfig = await fetchFirestoreDocumentRest("wayfic_forms", formId);
@@ -1736,8 +1726,7 @@ async function startServer() {
               console.log("[Wayfic Mailer] REST API wayfic_forms lookup skipped (using fallback).");
             }
           }
-
-          // 3. Try standard client SDK fallback
+          // 2. Try standard client SDK fallback
           if (!formConfig && dbInstance) {
             try {
               const formSnap = await fsGetDoc(fsDoc(dbInstance, "wayfic_forms", formId));
@@ -1766,19 +1755,7 @@ async function startServer() {
       // 2. Load SMTP configurations
       let smtp: any = null;
       try {
-        // 1. Try Admin SDK first
-        if (adminDbInstance) {
-          try {
-            const smtpSnap = await adminDbInstance.collection("settings").doc("smtp").get();
-            if (smtpSnap.exists) {
-              smtp = smtpSnap.data();
-            }
-          } catch (adminErr: any) {
-            console.log("[Wayfic Mailer] Admin SDK SMTP lookup skipped (using fallback).");
-          }
-        }
-
-        // 2. Try REST API fallback if Admin SDK failed or didn't run
+        // 1. Try REST API
         if (!smtp && firebaseClientConfig) {
           try {
             smtp = await fetchFirestoreDocumentRest("settings", "smtp");
@@ -1786,8 +1763,7 @@ async function startServer() {
             console.log("[Wayfic Mailer] REST API SMTP lookup skipped (using fallback).");
           }
         }
-
-        // 3. Try standard client SDK fallback
+        // 2. Try standard client SDK fallback
         if (!smtp && dbInstance) {
           try {
             const smtpSnap = await fsGetDoc(fsDoc(dbInstance, "settings", "smtp"));
@@ -1917,8 +1893,9 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    const viteModule = await eval('import("vite")');
+    const vite = await viteModule.createServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
