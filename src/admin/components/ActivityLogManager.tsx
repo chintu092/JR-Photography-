@@ -132,11 +132,11 @@ export default function ActivityLogManager() {
     return logs.filter(log => {
       const keywords = searchQuery.toLowerCase();
       const matchSearch = 
-        log.action.toLowerCase().includes(keywords) || 
-        log.details?.toLowerCase().includes(keywords) ||
-        log.adminEmail?.toLowerCase().includes(keywords);
+        (log.action || "").toLowerCase().includes(keywords) || 
+        (log.details || "").toLowerCase().includes(keywords) ||
+        (log.adminEmail || "").toLowerCase().includes(keywords);
 
-      const matchCat = filterCategory === "all" || log.category?.toLowerCase() === filterCategory.toLowerCase();
+      const matchCat = filterCategory === "all" || (log.category || "").toLowerCase() === filterCategory.toLowerCase();
       
       let matchTime = true;
       if (filterTime !== "all" && log.createdAt) {
@@ -158,7 +158,7 @@ export default function ActivityLogManager() {
   }, [logs, searchQuery, filterCategory, filterTime]);
 
   const getActionStyles = (action: string) => {
-    const act = action.toLowerCase();
+    const act = (action || "").toLowerCase();
     if (act.includes("delete") || act.includes("remove") || act.includes("clear") || act.includes("purge")) {
       return "bg-red-500/10 border-red-500/30 text-red-400";
     }
@@ -282,21 +282,21 @@ export default function ActivityLogManager() {
                           <User className="w-3.5 h-3.5 text-[#cfb53b]" />
                         </div>
                         <div className="leading-snug">
-                          <p className="text-zinc-200 font-medium max-w-[140px] truncate">{log.adminEmail}</p>
-                          <span className="text-[8.5px] font-mono text-zinc-500 select-all font-semibold uppercase">{log.adminUid.slice(0, 8)}</span>
+                          <p className="text-zinc-200 font-medium max-w-[140px] truncate">{log.adminEmail || "unknown@admin.com"}</p>
+                          <span className="text-[8.5px] font-mono text-zinc-500 select-all font-semibold uppercase">{(log.adminUid || "unknown").slice(0, 8)}</span>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className={`px-2.5 py-1 rounded-lg border text-[9.5px] font-bold tracking-wider font-mono uppercase shrink-0 ${getActionStyles(log.action)}`}>
-                        {log.action}
+                      <span className={`px-2.5 py-1 rounded-lg border text-[9.5px] font-bold tracking-wider font-mono uppercase shrink-0 ${getActionStyles(log.action || "")}`}>
+                        {log.action || "Unknown Action"}
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="text-[9.5px] uppercase font-mono tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5 text-zinc-400 font-semibold">{log.category}</span>
+                      <span className="text-[9.5px] uppercase font-mono tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5 text-zinc-400 font-semibold">{log.category || "General"}</span>
                     </td>
                     <td className="py-4 px-6">
-                      <p className="text-zinc-300 font-normal leading-relaxed max-w-[340px] break-words">{log.details}</p>
+                      <p className="text-zinc-300 font-normal leading-relaxed max-w-[340px] break-words">{log.details || "No details provided"}</p>
                     </td>
                     <td className="py-4 px-6 text-right font-mono text-[10.5px] text-zinc-400">
                       {formatTimestamp(log.createdAt)}
@@ -312,18 +312,18 @@ export default function ActivityLogManager() {
             {filteredLogs.map((log) => (
               <div key={log.id} className="p-5 space-y-3 hover:bg-white/[0.012] transition-colors">
                 <div className="flex items-center justify-between">
-                  <span className={`px-2 py-0.5 rounded border text-[8.5px] font-bold tracking-wider font-mono uppercase ${getActionStyles(log.action)}`}>
-                    {log.action}
+                  <span className={`px-2 py-0.5 rounded border text-[8.5px] font-bold tracking-wider font-mono uppercase ${getActionStyles(log.action || "")}`}>
+                    {log.action || "Unknown Action"}
                   </span>
                   <span className="text-[9.5px] font-mono text-zinc-500 font-semibold">{formatTimestamp(log.createdAt)}</span>
                 </div>
-                <p className="text-white text-xs">{log.details}</p>
+                <p className="text-white text-xs">{log.details || "No details provided"}</p>
                 <div className="flex items-center justify-between pt-1 text-[9.5px] font-mono text-zinc-400">
                   <span className="flex items-center gap-1.5">
                     <User className="w-3 h-3 text-[#cfb53b]" />
-                    <span className="truncate max-w-[120px] font-semibold">{log.adminEmail}</span>
+                    <span className="truncate max-w-[120px] font-semibold">{log.adminEmail || "unknown@admin.com"}</span>
                   </span>
-                  <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5 uppercase text-[8.5px]">{log.category}</span>
+                  <span className="bg-white/5 px-2 py-0.5 rounded border border-white/5 uppercase text-[8.5px]">{log.category || "General"}</span>
                 </div>
               </div>
             ))}

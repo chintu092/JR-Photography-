@@ -13,7 +13,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { BlogPost, SEOSettings } from "../../types";
 import { BLOG_POSTS } from "../../data";
-import { getCollectionData } from "../../lib/db-client";
+import { getCollectionData, saveDocument, deleteDocument } from "../../lib/db-client";
 import ImagePreviewInput from "./ImagePreviewInput";
 import SEOAssistantPanel from "./SEOAssistantPanel";
 
@@ -223,7 +223,7 @@ export default function BlogManager() {
         // Remove slug from data body
         if (data.slug) delete data.slug;
 
-        await setDoc(doc(db, "blog", baseSlug), data);
+        await saveDocument("blog", baseSlug, data);
         successCount++;
       }));
       toast.success(`Successfully added ${successCount} blog drafts`);
@@ -306,7 +306,7 @@ export default function BlogManager() {
       data.createdAt = finalCreatedAt;
 
       // 1. Commit primary post body inside Firestore `blog`
-      await setDoc(doc(db, "blog", id!), data, { merge: true });
+      await saveDocument("blog", id!, data);
 
       // 2. Commit parallel customized page SEO metrics
       const seoData = {
@@ -320,7 +320,7 @@ export default function BlogManager() {
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       };
-      await setDoc(doc(db, "settings", "seo", "pages", `blog-detail-${id}`), seoData, { merge: true });
+      await saveDocument("settings_seo_pages", `blog-detail-${id}`, seoData);
 
       // Log creation or update
       await logAdminActivity(
@@ -334,8 +334,8 @@ export default function BlogManager() {
       // If existing item and id changed, delete old one
       if (!isNew && oldId && oldId !== id) {
         try {
-          await deleteDoc(doc(db, "blog", oldId));
-          await deleteDoc(doc(db, "settings", "seo", "pages", `blog-detail-${oldId}`));
+          await deleteDocument("blog", oldId);
+          await deleteDocument("settings_seo_pages", `blog-detail-${oldId}`);
         } catch (e) {
           console.warn("Failed to delete outdated old document:", e);
         }
@@ -369,9 +369,9 @@ export default function BlogManager() {
     setSaving(true);
     setMessage(null);
     try {
-      await deleteDoc(doc(db, "blog", deleteId));
+      await deleteDocument("blog", deleteId);
       // Delete SEO record too to keep Firestore database perfectly clean
-      await deleteDoc(doc(db, "settings", "seo", "pages", `blog-detail-${deleteId}`));
+      await deleteDocument("settings_seo_pages", `blog-detail-${deleteId}`);
 
       await logAdminActivity(
         "Deleted Blog Post",
@@ -406,7 +406,7 @@ export default function BlogManager() {
 
       for (const item of BLOG_POSTS) {
         const id = item.id || item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        await setDoc(doc(db, "blog", id), {
+        await saveDocument("blog", id, {
           ...item,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -414,7 +414,7 @@ export default function BlogManager() {
         });
 
         // Seed basic dynamic page-level search settings matching SEO defaults
-        await setDoc(doc(db, "settings", "seo", "pages", `blog-detail-${id}`), {
+        await saveDocument("settings_seo_pages", `blog-detail-${id}`, {
           title: item.title,
           description: item.summary,
           focusKeyword: item.category,

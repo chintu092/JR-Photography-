@@ -57,6 +57,10 @@ export default function DatabaseManager() {
   const [counts, setCounts] = useState<{ [key: string]: number }>({});
   const [loadingCounts, setLoadingCounts] = useState(false);
 
+  // MongoDB stats state
+  const [mongoCounts, setMongoCounts] = useState<{ [key: string]: number }>({});
+  const [loadingMongoCounts, setLoadingMongoCounts] = useState(false);
+
   // Active database engine state
   const [activeEngine, setActiveEngine] = useState<"firestore" | "mongodb" | "mysql">("firestore");
 
@@ -120,6 +124,40 @@ export default function DatabaseManager() {
     }
   };
 
+  // Fetch count statistics for MongoDB collections
+  const fetchMongoCounts = async () => {
+    if (!mongoUri) return;
+    setLoadingMongoCounts(true);
+    try {
+      const res = await fetch("/api/database/mongodb/counts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connectionString: mongoUri,
+          database: mongoDbName,
+          collections: collectionsToBackup
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.counts) {
+          setMongoCounts(data.counts);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching MongoDB counts:", err);
+    } finally {
+      setLoadingMongoCounts(false);
+    }
+  };
+
+  // Refresh MongoDB counts when active tab or configuration changes
+  useEffect(() => {
+    if (activeTab === "mongodb" && mongoUri) {
+      fetchMongoCounts();
+    }
+  }, [activeTab, mongoUri, mongoDbName]);
+
   // Load database connections settings when mounting
   useEffect(() => {
     async function loadConfig() {
@@ -130,6 +168,7 @@ export default function DatabaseManager() {
           const data = docSnap.data();
           if (data.activeEngine) {
             setActiveEngine(data.activeEngine);
+            setActiveTab(data.activeEngine);
           }
           if (data.mongodb) {
             setMongoUri(data.mongodb.connectionString || "");
@@ -269,6 +308,9 @@ export default function DatabaseManager() {
 
       await setDoc(databaseDocRef, currentData);
       setMessage({ type: "success", text: `${dbType === "mongodb" ? "MongoDB Atlas" : "MySQL"} server configuration committed and saved.` });
+      if (dbType === "mongodb") {
+        fetchMongoCounts();
+      }
     } catch (e: any) {
       setMessage({ type: "error", text: `Failed to save configurations: ${e.message}` });
     } finally {
@@ -307,6 +349,9 @@ export default function DatabaseManager() {
 
       if (dbType === "mongodb") {
         setMongoTestResult({ success: data.success, message: data.message, details: data.details });
+        if (data.success) {
+          fetchMongoCounts();
+        }
       } else {
         setMysqlTestResult({ success: data.success, message: data.message, details: data.details });
       }
@@ -379,6 +424,9 @@ export default function DatabaseManager() {
           type: "success", 
           text: `Synchronization completed! Migrated ${syncResult.details?.totalRecordsMigrated} records in ${syncResult.details?.migratedCollectionsCount} tables/collections.` 
         });
+        if (dbType === "mongodb") {
+          fetchMongoCounts();
+        }
       } else {
         setMessage({ type: "error", text: `Migration error: ${syncResult.message}` });
       }
@@ -504,6 +552,9 @@ export default function DatabaseManager() {
       }
 
       await fetchCounts();
+      if (dbType === "mongodb") {
+        fetchMongoCounts();
+      }
 
       setMessage({
         type: "success",
@@ -547,78 +598,156 @@ export default function DatabaseManager() {
     }
   };
 
-  const exportDatabase = async () => {
+  const downloadDatabaseBackup = async (engine: "firestore" | "mongodb" | "mysql") => {
     setProcessing(true);
     setMessage(null);
     try {
-      const exportJson: any = {};
-      for (const colName of collectionsToBackup) {
-        const querySnapshot = await getDocs(collection(db, colName));
-        exportJson[colName] = [];
-        querySnapshot.forEach((doc) => {
-          exportJson[colName].push({ id: doc.id, ...doc.data() });
-        });
-      }
-
-      const settingsExport: any = {};
-      try {
-        const settingsSnap = await getDocs(collection(db, "settings"));
-        settingsSnap.forEach((docSnap) => {
-          let data: any = { id: docSnap.id, ...docSnap.data() };
-          // Redact database credentials and connection options on backup export
-          if (docSnap.id === "database") {
-            if (data.mysql && typeof data.mysql === 'object') {
-              data.mysql = { ...data.mysql, password: "" };
+      if (engine === "firestore") {
+        const exportJson: any = {};
+        for (const colName of collectionsToBackup) {
+          try {
+            if (colName === "settings_hero") {
+              const docSnap = await getDoc(doc(db, "settings", "hero"));
+              exportJson[colName] = docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
+            } else if (colName === "settings_seo") {
+              const docSnap = await getDoc(doc(db, "settings", "seo"));
+              exportJson[colName] = docSnap.exists() ? [{ id: docSnap.id, ...docSnap.data() }] : [];
+            } else if (colName === "settings_seo_pages") {
+              const querySnapshot = await getDocs(collection(db, "settings", "seo", "pages"));
+              exportJson[colName] = [];
+              querySnapshot.forEach((doc) => {
+                exportJson[colName].push({ id: doc.id, ...doc.data() });
+              });
+            } else {
+              const querySnapshot = await getDocs(collection(db, colName));
+              exportJson[colName] = [];
+              querySnapshot.forEach((doc) => {
+                exportJson[colName].push({ id: doc.id, ...doc.data() });
+              });
             }
-            if (data.mongodb && typeof data.mongodb === 'object') {
-              data.mongodb = { ...data.mongodb, connectionString: "" };
-            }
+          } catch (e) {
+            console.warn(`Export failed for Firestore collection ${colName}:`, e);
+            exportJson[colName] = [];
           }
-          settingsExport[docSnap.id] = data;
-        });
-      } catch (e) {
-        console.warn(`Failed to export settings collection`, e);
-      }
-      
-      try {
-        const seoDocs = await getDocs(collection(db, "settings/seo/pages"));
-        settingsExport['seo_pages'] = [];
-        seoDocs.forEach(d => {
-          settingsExport['seo_pages'].push({ id: d.id, ...d.data() });
-        });
-      } catch (e) {
-        console.warn('Failed to export seo/pages', e);
-      }
-      exportJson['settings'] = settingsExport;
-
-      const jsonString = JSON.stringify(exportJson, (key, value) => {
-        if (value && typeof value === 'object' && 'seconds' in value && 'nanoseconds' in value) {
-          return {
-            __type: 'timestamp',
-            seconds: value.seconds,
-            nanoseconds: value.nanoseconds
-          };
         }
-        return value;
-      }, 2);
 
+        const settingsExport: any = {};
+        try {
+          const settingsSnap = await getDocs(collection(db, "settings"));
+          settingsSnap.forEach((docSnap) => {
+            let data: any = { id: docSnap.id, ...docSnap.data() };
+            // Redact credentials
+            if (docSnap.id === "database") {
+              if (data.mysql && typeof data.mysql === "object") {
+                data.mysql = { ...data.mysql, password: "" };
+              }
+              if (data.mongodb && typeof data.mongodb === "object") {
+                data.mongodb = { ...data.mongodb, connectionString: "" };
+              }
+            }
+            settingsExport[docSnap.id] = data;
+          });
+        } catch (e) {
+          console.warn(`Failed to export settings collection`, e);
+        }
+
+        try {
+          const seoDocs = await getDocs(collection(db, "settings/seo/pages"));
+          settingsExport["seo_pages"] = [];
+          seoDocs.forEach((d) => {
+            settingsExport["seo_pages"].push({ id: d.id, ...d.data() });
+          });
+        } catch (e) {
+          console.warn("Failed to export seo/pages", e);
+        }
+        exportJson["settings"] = settingsExport;
+
+        const jsonString = JSON.stringify(exportJson, (key, value) => {
+          if (value && typeof value === "object" && "seconds" in value && "nanoseconds" in value) {
+            return {
+              __type: "timestamp",
+              seconds: value.seconds,
+              nanoseconds: value.nanoseconds
+            };
+          }
+          return value;
+        }, 2);
+
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `jrphotography-firestore-backup-${new Date().toISOString().split("T")[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        setMessage({ type: "success", text: "Google Firestore database exported successfully!" });
+        return;
+      }
+
+      // MongoDB or MySQL backup download
+      const configPayload = engine === "mongodb" ? {
+        connectionString: mongoUri,
+        database: mongoDbName
+      } : {
+        host: mysqlHost,
+        port: mysqlPort,
+        user: mysqlUser,
+        password: mysqlPass,
+        database: mysqlDb
+      };
+
+      if (engine === "mongodb" && !mongoUri) {
+        throw new Error("MongoDB Connection URI is not configured.");
+      }
+      if (engine === "mysql" && (!mysqlHost || !mysqlUser || !mysqlDb)) {
+        throw new Error("MySQL connection configurations are incomplete.");
+      }
+
+      const res = await fetch("/api/database/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: engine,
+          config: configPayload,
+          collections: collectionsToBackup
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || `Failed to pull records from ${engine.toUpperCase()}`);
+      }
+
+      const data = await res.json();
+      if (!data.success || !data.payload) {
+        throw new Error(data.message || "Invalid response payload from server.");
+      }
+
+      const jsonString = JSON.stringify(data.payload, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `jrphotography-db-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `jrphotography-${engine}-backup-${new Date().toISOString().split("T")[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      setMessage({ type: "success", text: "Database exported successfully!" });
+      setMessage({ type: "success", text: `${engine.toUpperCase()} database exported and downloaded successfully!` });
     } catch (error: any) {
-      console.error("Export error:", error);
-      setMessage({ type: "error", text: "Failed to export database: " + error.message });
+      console.error(`${engine} export error:`, error);
+      setMessage({ type: "error", text: `Failed to download ${engine.toUpperCase()} database: ` + error.message });
     } finally {
       setProcessing(false);
     }
+  };
+
+  const exportDatabase = async () => {
+    await downloadDatabaseBackup("firestore");
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -765,6 +894,36 @@ export default function DatabaseManager() {
         >
           {loadingCounts ? <Loader2 className="w-3.5 h-3.5 animate-spin text-luxury-gold" /> : <RefreshCw className="w-3.5 h-3.5 text-luxury-gold" />}
           <span>Refresh Database Statistics</span>
+        </button>
+      </div>
+
+      {/* Quick Download of Active Database Panel */}
+      <div className="p-6 md:p-8 rounded-3xl bg-[#0b0a11]/90 border border-luxury-gold/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-md">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-luxury-gold/5 rounded-full blur-3xl opacity-60 pointer-events-none" />
+        <div className="space-y-1.5 z-10">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h3 className="text-white text-base font-semibold flex items-center gap-2">
+              <span>Active Database Engine:</span>
+              <span className="text-luxury-gold italic uppercase font-mono tracking-wider">
+                {activeEngine === "firestore" && "Google Firestore (Native)"}
+                {activeEngine === "mongodb" && "MongoDB Atlas"}
+                {activeEngine === "mysql" && "MySQL Relational"}
+              </span>
+            </h3>
+          </div>
+          <p className="text-luxury-cream/50 text-xs max-w-xl">
+            This database is currently serving all public content feeds, website traffic, and contact registrations. Click the quick download to fetch a complete JSON backup of the active database instance.
+          </p>
+        </div>
+
+        <button
+          onClick={() => downloadDatabaseBackup(activeEngine)}
+          disabled={processing}
+          className="w-full md:w-auto px-6 py-4 bg-luxury-gold text-black hover:bg-white hover:text-black rounded-xl transition-all duration-300 font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 shrink-0 cursor-pointer disabled:opacity-50 z-10 shadow-lg shadow-luxury-gold/10"
+        >
+          {processing ? <Loader2 className="w-4 h-4 animate-spin text-black" /> : <Download className="w-4 h-4 text-black" />}
+          <span>Download Current Database (JSON)</span>
         </button>
       </div>
 
@@ -1059,7 +1218,8 @@ export default function DatabaseManager() {
 
         {/* TAB 2: MongoDB Atlas */}
         {activeTab === "mongodb" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Config & Controls column */}
             <div className="lg:col-span-2 bg-luxury-black/40 border border-white/5 rounded-3xl p-8 backdrop-blur-sm space-y-6">
               {/* Active Engine Status Control */}
@@ -1191,6 +1351,40 @@ export default function DatabaseManager() {
                   {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-emerald-400" />}
                   <span>Pull Atlas to Firestore</span>
                 </button>
+
+                <button
+                  onClick={() => downloadDatabaseBackup("mongodb")}
+                  disabled={processing || !mongoUri}
+                  className="w-full py-4 bg-[#12281a]/40 border border-[#234b33]/40 hover:bg-emerald-500 hover:text-black hover:border-transparent text-emerald-400 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <span>Download Atlas JSON Backup</span>
+                </button>
+              </div>
+            </div>
+          </div>
+            
+            {/* Active MongoDB Metadata Mapping */}
+            <div className="bg-luxury-black/40 border border-white/5 rounded-3xl p-8 backdrop-blur-sm">
+              <h3 className="font-serif text-lg text-white mb-6 flex items-center gap-2">
+                <DatabaseZap className="w-4 h-4 text-emerald-400" />
+                <span>Active MongoDB Metadata Mapping</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {collectionsToBackup.map((colName) => (
+                  <div key={colName} className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between min-h-[110px] relative group hover:border-emerald-500/30 transition-all duration-300">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest block truncate">{colName}</span>
+                      <span className="text-[11px] text-luxury-cream/40 block leading-normal">{getFriendlyName(colName)}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between mt-3 pt-2 border-t border-white/5">
+                      <span className="text-2xl font-sans font-bold text-white">
+                        {loadingMongoCounts ? "..." : mongoCounts[colName] ?? 0}
+                      </span>
+                      <span className="text-[9px] text-[#cfb53b] uppercase font-bold tracking-wider">records</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1361,6 +1555,15 @@ export default function DatabaseManager() {
                 >
                   {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-sky-400" />}
                   <span>Pull MySQL to Firestore</span>
+                </button>
+
+                <button
+                  onClick={() => downloadDatabaseBackup("mysql")}
+                  disabled={processing || !mysqlHost || !mysqlUser || !mysqlDb}
+                  className="w-full py-4 bg-[#0f2430]/40 border border-[#1b3d52]/40 hover:bg-sky-500 hover:text-black hover:border-transparent text-sky-400 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <span>Download MySQL JSON Backup</span>
                 </button>
               </div>
             </div>

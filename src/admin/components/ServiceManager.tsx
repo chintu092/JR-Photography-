@@ -13,7 +13,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { Service, SEOSettings } from "../../types";
 import { SERVICES } from "../../data";
-import { getCollectionData } from "../../lib/db-client";
+import { getCollectionData, saveDocument, deleteDocument } from "../../lib/db-client";
 import SEOAssistantPanel from "./SEOAssistantPanel";
 
 export default function ServiceManager() {
@@ -166,7 +166,7 @@ export default function ServiceManager() {
       data.createdAt = finalCreatedAt;
 
       // 1. Save standard service card
-      await setDoc(doc(db, "services", id!), data, { merge: true });
+      await saveDocument("services", id!, data);
 
       // 2. Parallel save nested service-level SEO coordinates
       const seoData = {
@@ -180,7 +180,7 @@ export default function ServiceManager() {
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       };
-      await setDoc(doc(db, "settings", "seo", "pages", `service-${id}`), seoData, { merge: true });
+      await saveDocument("settings_seo_pages", `service-${id}`, seoData);
 
       setMessage({ type: "success", text: `Service architecture "${data.title}" saved successfully along with SEO configs!` });
       toast.success(`Service architecture "${data.title}" saved successfully along with SEO configs!`);
@@ -204,8 +204,8 @@ export default function ServiceManager() {
     setSaving(true);
     setMessage(null);
     try {
-      await deleteDoc(doc(db, "services", deleteId));
-      await deleteDoc(doc(db, "settings", "seo", "pages", `service-${deleteId}`));
+      await deleteDocument("services", deleteId);
+      await deleteDocument("settings_seo_pages", `service-${deleteId}`);
 
       setItems(prev => prev.filter(i => i.id !== deleteId));
       setMessage({ type: "success", text: "Service item and associated metadata deleted successfully." });
@@ -234,7 +234,7 @@ export default function ServiceManager() {
 
       for (const item of SERVICES) {
         const id = item.id || `service-${item.num}`;
-        await setDoc(doc(db, "services", id), {
+        await saveDocument("services", id, {
           ...item,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -242,7 +242,7 @@ export default function ServiceManager() {
         });
 
         // Seed basic dynamic service SEO coordinates
-        await setDoc(doc(db, "settings", "seo", "pages", `service-${id}`), {
+        await saveDocument("settings_seo_pages", `service-${id}`, {
           title: item.title,
           description: item.description,
           focusKeyword: item.tags.join(", "),
@@ -300,7 +300,7 @@ export default function ServiceManager() {
     try {
       // Setup batch updates
       await Promise.all(updatedItems.map(item => 
-        setDoc(doc(db, "services", item.id), { order: item.order }, { merge: true })
+        saveDocument("services", item.id, { order: item.order })
       ));
       toast.success("Service order saved successfully.");
     } catch (error) {

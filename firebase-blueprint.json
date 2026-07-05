@@ -364,6 +364,22 @@
         "updatedBy": { "type": "string" }
       },
       "required": ["name", "price", "description", "features", "highlight", "tags", "order", "createdAt", "updatedAt", "updatedBy"]
+    },
+    "ActiveSession": {
+      "title": "Active Session",
+      "description": "Information about a currently active session / live user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ip": { "type": "string" },
+        "deviceType": { "type": "string" },
+        "os": { "type": "string" },
+        "browser": { "type": "string" },
+        "page": { "type": "string" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ip", "deviceType", "os", "browser", "page", "joinedAt", "lastActive"]
     }
   },
   "firestore": {
@@ -438,6 +454,10 @@
     "/wayfic_submissions/{submissionId}": {
       "schema": "WayficSubmission",
       "description": "Submissions collected via custom dynamic forms"
+    },
+    "/active_sessions/{sessionId}": {
+      "schema": "ActiveSession",
+      "description": "Tracking of currently active / live user sessions"
     }
   }
 }

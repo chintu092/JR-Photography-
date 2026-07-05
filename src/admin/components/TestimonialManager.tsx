@@ -7,7 +7,7 @@ import { Loader2, Plus, Edit2, Trash2, Save, X, Star, ChevronLeft, Quote, User, 
 import { motion, AnimatePresence } from "motion/react";
 import { Review } from "../../types";
 import { REVIEWS } from "../../data";
-import { getCollectionData } from "../../lib/db-client";
+import { getCollectionData, saveDocument, deleteDocument } from "../../lib/db-client";
 import ImagePreviewInput from "./ImagePreviewInput";
 
 export default function TestimonialManager() {
@@ -78,7 +78,7 @@ export default function TestimonialManager() {
     
     try {
       await Promise.all(updatedItems.map(item => 
-        setDoc(doc(db, "testimonials", item.id), { order: item.order }, { merge: true })
+        saveDocument("testimonials", item.id, { order: item.order })
       ));
       toast.success("Testimonial order saved successfully.");
     } catch (error) {
@@ -129,7 +129,7 @@ export default function TestimonialManager() {
         data.createdAt = editingItem.createdAt;
       }
 
-      await setDoc(doc(db, "testimonials", id!), data, { merge: true });
+      await saveDocument("testimonials", id!, data);
       setMessage({ type: "success", text: `Client feedback from "${data.name}" saved successfully!` });
       toast.success(`Client feedback from "${data.name}" saved successfully!`);
       setTimeout(() => {
@@ -151,7 +151,7 @@ export default function TestimonialManager() {
     setSaving(true);
     setMessage(null);
     try {
-      await deleteDoc(doc(db, "testimonials", deleteId));
+      await deleteDocument("testimonials", deleteId);
       setItems(prev => prev.filter(i => i.id !== deleteId));
       setMessage({ type: "success", text: "Feedback removed successfully." });
       toast.success("Feedback removed successfully.");
@@ -180,7 +180,7 @@ export default function TestimonialManager() {
       for (const review of REVIEWS) {
         const { id: reviewId, ...cleanReview } = review;
         const id = reviewId || cleanReview.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        await setDoc(doc(db, "testimonials", id), {
+        await saveDocument("testimonials", id, {
           ...cleanReview,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),

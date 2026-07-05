@@ -28,9 +28,10 @@ interface FooterProps {
   logoUrl?: string | null;
   exploreConfig?: NavItem[];
   legalConfig?: NavItem[];
+  copyrightText?: string;
 }
 
-export default function Footer({ onNavigate, logoUrl = null, exploreConfig, legalConfig }: FooterProps) {
+export default function Footer({ onNavigate, logoUrl = null, exploreConfig, legalConfig, copyrightText }: FooterProps) {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,7 +234,11 @@ export default function Footer({ onNavigate, logoUrl = null, exploreConfig, lega
         {/* BOTTOM BAR */}
         <div className="pt-10 flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-zinc-500 tracking-[0.1em] uppercase border-t border-white/5 mt-10">
           <div className="mb-6 md:mb-0 flex items-center relative group">
-            <span>© 2026 JR Photography Studio. All rights reserved globally.</span>
+            <span>
+              {(copyrightText || "© {YYYY} JR Photography Studio. All rights reserved globally.")
+                .replace("2026", new Date().getFullYear().toString())
+                .replace("{YYYY}", new Date().getFullYear().toString())}
+            </span>
             <button 
               onClick={() => handleLinkClick("admin")} 
               className="absolute inset-0 opacity-0 cursor-pointer"

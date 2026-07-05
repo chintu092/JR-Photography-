@@ -33,11 +33,15 @@ import LeadManager from "./components/LeadManager";
 import EmailTemplatesManager from "./components/EmailTemplatesManager";
 import WayficFormsManager from "./components/WayficFormsManager";
 import PricingManager from "./components/PricingManager";
+import LiveSessionsManager from "./components/LiveSessionsManager";
+import AutomationTestManager from "./components/AutomationTestManager";
 import { ShieldAlert } from "lucide-react";
 import Logo from "../components/Logo";
+import { generateSecret, verifyTOTP, getQRCodeUrl, getQRCodeImageUrl } from "../utils/totp";
+import { Smartphone } from "lucide-react";
 
 export default function AdminPanel({ onBack }: { onBack: () => void }) {
-  const { user, isAdmin, role: currentAdminRole, permissions: currentAdminPermissions, loading, isApproved, login, loginWithCredentials, registerWithCredentials, logout } = useAuth();
+  const { user, isAdmin, role: currentAdminRole, permissions: currentAdminPermissions, hasPermission, loading, isApproved, login, loginWithCredentials, registerWithCredentials, logout } = useAuth();
   const toast = useToast();
   const isRootAdmin = user?.email && user.email.toLowerCase().trim() === "supriyos9@gmail.com";
   const effectiveIsAdmin = isAdmin || isRootAdmin;
@@ -46,29 +50,49 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
   const [faviconUrl, setFaviconUrl] = useState("");
   const [brandTextLine1, setBrandTextLine1] = useState("JR");
   const [brandTextLine2, setBrandTextLine2] = useState("PHOTOGRAPHY");
+  const [footerCopyrightText, setFooterCopyrightText] = useState("© {YYYY} JR Photography Studio. All rights reserved globally.");
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("1234567890");
   const [whatsappMessage, setWhatsappMessage] = useState("Hello! I'm interested in booking a photography consultation. Could you share more details?");
+  const [whatsappHoursEnabled, setWhatsappHoursEnabled] = useState(false);
+  const [whatsappHoursStart, setWhatsappHoursStart] = useState("09:00");
+  const [whatsappHoursEnd, setWhatsappHoursEnd] = useState("18:00");
+  const [whatsappDays, setWhatsappDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [whatsappAwayMessage, setWhatsappAwayMessage] = useState("We are currently away. We'll respond as soon as we're back!");
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "general" | "seo" | "theme" | "hero" | "portfolio" | "blog" | "testimonials" | "pricing" | "process" | "studio" | "community" | "faq" | "navigation" | "database" | "admins" | "subscribers" | "assets" | "activity" | "leads" | "email_templates" | "wayfic_forms">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "general" | "seo" | "theme" | "hero" | "portfolio" | "blog" | "testimonials" | "pricing" | "process" | "studio" | "community" | "faq" | "navigation" | "database" | "admins" | "subscribers" | "assets" | "activity" | "leads" | "email_templates" | "wayfic_forms" | "live_sessions" | "qa_automation">("dashboard");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const oauthError = params.get('oauth_error');
+      if (oauthError) {
+        // Clear error parameter to keep URL clean
+        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+        
+        const decodedError = decodeURIComponent(oauthError);
+        setMessage({ type: "error", text: `Google Sign-In failed: ${decodedError}` });
+        toast.error(`Google Sign-In failed: ${decodedError}`);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (currentAdminRole === "writer" || currentAdminRole === "Writer") {
       setActiveTab("blog");
-    } else if (currentAdminPermissions && currentAdminPermissions.length > 0 && !currentAdminPermissions.includes("dashboard") && currentAdminRole !== "super_admin" && !isRootAdmin) {
+    } else if (currentAdminPermissions && currentAdminPermissions.length > 0 && !hasPermission(currentAdminRole, "dashboard") && currentAdminRole !== "super_admin" && !isRootAdmin) {
       // If they don't have dashboard access, default to their first permitted tab
       setActiveTab(currentAdminPermissions[0] as any);
     }
-  }, [currentAdminRole, currentAdminPermissions, isRootAdmin]);
+  }, [currentAdminRole, currentAdminPermissions, hasPermission, isRootAdmin]);
 
   const hasAccessToTab = (tabId: string) => {
-    if (currentAdminRole === "writer" || currentAdminRole === "Writer") {
-      return tabId === "blog";
-    }
     if (isRootAdmin || currentAdminRole === "super_admin") return true; // super admin has all access
     if (tabId === "admins") return false; // ONLY super admins can access admins tab!
-    // check if permission list includes tabId
-    return currentAdminPermissions?.includes(tabId) || false;
+    
+    // Defer to centrally managed role permissions schema
+    return hasPermission(currentAdminRole, tabId);
   };
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -119,9 +143,15 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             setFaviconUrl(data.faviconUrl || "");
             setBrandTextLine1(data.brandTextLine1 || "JR");
             setBrandTextLine2(data.brandTextLine2 || "PHOTOGRAPHY");
+            if (data.footerCopyrightText) setFooterCopyrightText(data.footerCopyrightText);
             setWhatsappEnabled(data.whatsappEnabled !== undefined ? data.whatsappEnabled : true);
             setWhatsappNumber(data.whatsappNumber || "1234567890");
             setWhatsappMessage(data.whatsappMessage || "Hello! I'm interested in booking a photography consultation. Could you share more details?");
+            setWhatsappHoursEnabled(data.whatsappHoursEnabled !== undefined ? data.whatsappHoursEnabled : false);
+            setWhatsappHoursStart(data.whatsappHoursStart || "09:00");
+            setWhatsappHoursEnd(data.whatsappHoursEnd || "18:00");
+            setWhatsappDays(data.whatsappDays || [1, 2, 3, 4, 5]);
+            setWhatsappAwayMessage(data.whatsappAwayMessage || "We are currently away. We'll respond as soon as we're back!");
           }
         } catch (error) {
           console.error("Error fetching settings:", error);
@@ -141,9 +171,15 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
         faviconUrl,
         brandTextLine1,
         brandTextLine2,
+        footerCopyrightText,
         whatsappEnabled,
         whatsappNumber,
         whatsappMessage,
+        whatsappHoursEnabled,
+        whatsappHoursStart,
+        whatsappHoursEnd,
+        whatsappDays,
+        whatsappAwayMessage,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       }, { merge: true });
@@ -277,7 +313,211 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     }
   };
 
-  if (loading) {
+  // Google Authenticator 2FA states
+  const [twoFactorVerified, setTwoFactorVerified] = useState(false);
+  const [hasTwoFactor, setHasTwoFactor] = useState(false);
+  const [twoFactorSecret, setTwoFactorSecret] = useState("");
+  const [checking2FA, setChecking2FA] = useState(true);
+
+  // Authenticator setup modal states
+  const [isTwoFactorSetupOpen, setIsTwoFactorSetupOpen] = useState(false);
+  const [setupSecret, setSetupSecret] = useState("");
+  const [setupQRUrl, setSetupQRUrl] = useState("");
+  const [setupCode, setSetupCode] = useState("");
+  const [setupError, setSetupError] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+
+  // Active 2FA login challenge code
+  const [totpChallengeCode, setTotpChallengeCode] = useState("");
+  const [totpChallengeError, setTotpChallengeError] = useState("");
+  const [verifyingTotpChallenge, setVerifyingTotpChallenge] = useState(false);
+
+  // Load 2FA configuration from Firestore for the logged-in administrator
+  useEffect(() => {
+    async function checkTwoFactorStatus() {
+      if (user && user.email) {
+        try {
+          setChecking2FA(true);
+          const emailClean = user.email.toLowerCase().trim();
+          const adminDoc = await getDoc(doc(db, "admins", emailClean));
+          if (adminDoc.exists()) {
+            const data = adminDoc.data();
+            const enabled = !!data.twoFactorEnabled;
+            setHasTwoFactor(enabled);
+            setTwoFactorSecret(data.twoFactorSecret || "");
+            if (!enabled) {
+              setTwoFactorVerified(true);
+            } else {
+              setTwoFactorVerified(false);
+            }
+          } else {
+            setHasTwoFactor(false);
+            setTwoFactorVerified(true);
+          }
+        } catch (e) {
+          console.error("Error checking 2FA status:", e);
+          setHasTwoFactor(false);
+          setTwoFactorVerified(true);
+        } finally {
+          setChecking2FA(false);
+        }
+      } else {
+        setHasTwoFactor(false);
+        setTwoFactorVerified(false);
+        setChecking2FA(false);
+      }
+    }
+    checkTwoFactorStatus();
+  }, [user]);
+
+  const handleOpen2FAModal = () => {
+    setSetupError("");
+    setSetupCode("");
+    if (hasTwoFactor) {
+      // Already enabled, we'll open a modal letting them keep it or disable it
+      setIsTwoFactorSetupOpen(true);
+    } else {
+      // Generate key and qr code
+      try {
+        const secret = generateSecret();
+        const qrUrl = getQRCodeImageUrl(user?.email || "admin", secret);
+        setSetupSecret(secret);
+        setSetupQRUrl(qrUrl);
+        setIsTwoFactorSetupOpen(true);
+      } catch (e: any) {
+        toast.error("Failed to initialize Google 2FA: " + e.message);
+      }
+    }
+  };
+
+  const handleEnable2FA = async (e: any) => {
+    e.preventDefault();
+    setSetupLoading(true);
+    setSetupError("");
+    try {
+      const isValid = await verifyTOTP(setupSecret, setupCode);
+      if (!isValid) {
+        setSetupError("Incorrect 6-digit verification code. Please try again.");
+        setSetupLoading(false);
+        return;
+      }
+
+      if (!user || !user.email) return;
+      const emailClean = user.email.toLowerCase().trim();
+      const payload = {
+        twoFactorEnabled: true,
+        twoFactorSecret: setupSecret,
+        twoFactorUpdatedAt: new Date().toISOString()
+      };
+
+      // Write to email-scoped doc
+      await setDoc(doc(db, "admins", emailClean), payload, { merge: true });
+      // Write to UID-scoped doc
+      await setDoc(doc(db, "admins", user.uid), payload, { merge: true });
+
+      // Log in ledger
+      try {
+        await setDoc(doc(collection(db, "activity_logs")), {
+          action: "Enable 2FA",
+          details: `Administrator ${user.email} successfully activated Google Authenticator 2FA.`,
+          category: "Security",
+          createdAt: serverTimestamp(),
+          createdBy: user.email
+        });
+      } catch (err) {
+        console.error("Failed to log activity:", err);
+      }
+
+      setHasTwoFactor(true);
+      setTwoFactorSecret(setupSecret);
+      setTwoFactorVerified(true);
+      toast.success("Google Authenticator 2FA is now activated!");
+      setIsTwoFactorSetupOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      setSetupError("Failed to save configuration: " + err.message);
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
+  const handleDisable2FA = async (e: any) => {
+    e.preventDefault();
+    setSetupLoading(true);
+    setSetupError("");
+    try {
+      const isValid = await verifyTOTP(twoFactorSecret, setupCode);
+      if (!isValid) {
+        setSetupError("Incorrect current verification code. You must enter your current authenticator code to disable 2FA.");
+        setSetupLoading(false);
+        return;
+      }
+
+      if (!user || !user.email) return;
+      const emailClean = user.email.toLowerCase().trim();
+      const payload = {
+        twoFactorEnabled: false,
+        twoFactorSecret: "",
+        twoFactorUpdatedAt: new Date().toISOString()
+      };
+
+      // Write to email-scoped doc
+      await setDoc(doc(db, "admins", emailClean), payload, { merge: true });
+      // Write to UID-scoped doc
+      await setDoc(doc(db, "admins", user.uid), payload, { merge: true });
+
+      // Log in ledger
+      try {
+        await setDoc(doc(collection(db, "activity_logs")), {
+          action: "Disable 2FA",
+          details: `Administrator ${user.email} deactivated Google Authenticator 2FA.`,
+          category: "Security",
+          createdAt: serverTimestamp(),
+          createdBy: user.email
+        });
+      } catch (err) {
+        console.error("Failed to log activity:", err);
+      }
+
+      setHasTwoFactor(false);
+      setTwoFactorSecret("");
+      setTwoFactorVerified(true);
+      toast.success("Google Authenticator 2FA is now deactivated.");
+      setIsTwoFactorSetupOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      setSetupError("Failed to deactivate: " + err.message);
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
+  const handleTOTPChallengeSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!twoFactorSecret) {
+      setTotpChallengeError("Your security configuration is invalid. Please contact Super Admin.");
+      return;
+    }
+    setVerifyingTotpChallenge(true);
+    setTotpChallengeError("");
+    try {
+      const isValid = await verifyTOTP(twoFactorSecret, totpChallengeCode);
+      if (isValid) {
+        setTwoFactorVerified(true);
+        toast.success("Authentication succeeded! Welcome to the panel.");
+      } else {
+        setTotpChallengeError("Incorrect authenticator code. Please check your Google Authenticator app.");
+        setTotpChallengeCode("");
+      }
+    } catch (err: any) {
+      console.error("TOTP verification error:", err);
+      setTotpChallengeError("Verification failed: " + err.message);
+    } finally {
+      setVerifyingTotpChallenge(false);
+    }
+  };
+
+  if (loading || checking2FA) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-luxury-black text-luxury-cream">
         <Loader2 className="w-8 h-8 animate-spin text-luxury-gold" />
@@ -546,6 +786,66 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     );
   }
 
+  if (!twoFactorVerified) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-luxury-black text-luxury-cream p-4 sm:p-6 text-left">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full text-center space-y-8 bg-luxury-black/50 p-8 sm:p-12 border border-luxury-gold/20 rounded-2xl backdrop-blur-xl"
+        >
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
+              <ShieldCheck className="w-8 h-8 text-emerald-400" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-serif text-luxury-gold tracking-tight">Google Authenticator</h1>
+            <p className="text-luxury-cream/60 font-sans uppercase tracking-widest text-[10px]">Two-factor verification (MFA) required</p>
+          </div>
+          
+          <form onSubmit={handleTOTPChallengeSubmit} className="space-y-6">
+            <div className="space-y-3">
+              <p className="text-xs text-luxury-cream/60 leading-relaxed text-center">
+                Please enter the 6-digit verification code generated by your **Google Authenticator** app.
+              </p>
+              <input
+                type="text"
+                pattern="[0-9]*"
+                inputMode="numeric"
+                maxLength={6}
+                value={totpChallengeCode}
+                onChange={(e) => setTotpChallengeCode(e.target.value)}
+                placeholder="000000"
+                className={`w-full bg-[#0a0910] border ${totpChallengeError ? 'border-red-500/50' : 'border-white/10'} rounded-xl px-4 py-3 text-center text-2xl text-luxury-cream focus:outline-none focus:border-luxury-gold/40 tracking-[0.4em] font-mono`}
+                autoFocus
+                required
+              />
+              {totpChallengeError && (
+                <p className="text-red-400 text-center text-[10px] uppercase tracking-widest font-semibold">{totpChallengeError}</p>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={verifyingTotpChallenge}
+              className="w-full py-3.5 bg-luxury-gold text-luxury-black font-semibold rounded-xl hover:bg-luxury-cream transition-colors duration-500 font-sans tracking-widest uppercase text-xs flex items-center justify-center gap-2"
+            >
+              {verifyingTotpChallenge ? <Loader2 className="w-4 h-4 animate-spin text-luxury-black" /> : null}
+              <span>{verifyingTotpChallenge ? "Verifying..." : "Verify 2FA Token"}</span>
+            </button>
+          </form>
+
+          <button
+            onClick={logout}
+            className="w-full py-2 text-luxury-cream/40 hover:text-luxury-cream transition-colors duration-300 font-sans tracking-widest uppercase text-[10px]"
+          >
+            ← Sign Out & Return
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   const handleChangePasscode = async (e: any) => {
     e.preventDefault();
     if (!newPasscode) {
@@ -650,8 +950,10 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               { id: "blog", label: "Blog", icon: FileText },
               { id: "assets", label: "Asset Manager", icon: Folder },
               { id: "activity", label: "Activity Log", icon: Activity },
+              { id: "live_sessions", label: "Live Sessions", icon: Activity },
               { id: "navigation", label: "Navigation", icon: Compass },
               { id: "database", label: "Database Hub", icon: Database },
+              { id: "qa_automation", label: "QA & Automation", icon: Cpu },
               { id: "general", label: "Settings", icon: Settings },
               { id: "pricing", label: "Pricing", icon: DollarSign },
               { id: "email_templates", label: "Email Templates", icon: Mail },
@@ -737,8 +1039,10 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             { id: "blog", label: "Blog", icon: FileText },
             { id: "assets", label: "Asset Manager", icon: Folder },
             { id: "activity", label: "Activity Log", icon: Activity },
+            { id: "live_sessions", label: "Live Sessions", icon: Activity },
             { id: "navigation", label: "Navigation", icon: Compass },
             { id: "database", label: "Database Hub", icon: Database },
+            { id: "qa_automation", label: "QA & Automation", icon: Cpu },
             { id: "general", label: "Settings", icon: Settings },
             { id: "pricing", label: "Pricing", icon: DollarSign },
             { id: "email_templates", label: "Email Templates", icon: Mail },
@@ -824,6 +1128,19 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               </button>
 
               <button
+                onClick={handleOpen2FAModal}
+                className="w-full flex items-center justify-between p-2.5 bg-white/[0.02] hover:bg-white/5 text-luxury-cream hover:text-white rounded-xl border border-white/5 transition-all text-[10px] uppercase tracking-widest font-bold cursor-pointer animate-pulse-subtle"
+              >
+                <span className="flex items-center gap-2">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  Google 2FA
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold ${hasTwoFactor ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20" : "bg-zinc-500/20 text-zinc-400 border border-zinc-500/20"}`}>
+                  {hasTwoFactor ? "ACTIVE" : "OFF"}
+                </span>
+              </button>
+
+              <button
                 onClick={() => setIsLogoutConfirmOpen(true)}
                 className="w-full flex items-center justify-between p-2.5 bg-red-500/5 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-xl border border-red-500/10 transition-all text-[10px] uppercase tracking-widest font-bold cursor-pointer"
               >
@@ -840,7 +1157,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
 
       <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
         {/* Admin Header */}
-        <header className="border-b border-[#1a1829] bg-[#0a0910]/80 backdrop-blur-md shrink-0 px-4 md:px-8 h-20 flex items-center justify-between">
+        <header className="relative z-30 border-b border-[#1a1829] bg-[#0a0910]/80 backdrop-blur-md shrink-0 px-4 md:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             {/* Hamburger trigger on mobile */}
             <button 
@@ -1097,6 +1414,20 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
 
+                <div className="pt-6 border-t border-white/5 animate-in fade-in-50 duration-500">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-[#cfb53b] font-semibold">Footer Copyright Text</label>
+                    <input
+                      type="text"
+                      value={footerCopyrightText}
+                      onChange={(e) => setFooterCopyrightText(e.target.value)}
+                      placeholder="© {YYYY} JR Photography Studio. All rights reserved globally."
+                      className="w-full bg-[#0a0910] border border-white/5 rounded-2xl px-6 py-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold/40 transition-all font-mono"
+                    />
+                    <p className="text-[10px] text-zinc-500">Global footer copyright copy. Use <strong>{'{YYYY}'}</strong> for dynamic current year.</p>
+                  </div>
+                </div>
+
                 <div className="pt-8 border-t border-white/5 space-y-6">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[#25D366] font-medium">
@@ -1138,6 +1469,91 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                           placeholder="Enter the default message..."
                           className="w-full bg-[#0a0910] border border-white/5 rounded-2xl px-6 py-4 text-sm text-luxury-cream focus:outline-none focus:border-[#25D366]/40 transition-all resize-none"
                         />
+                      </div>
+
+                      <div className="pt-6 border-t border-white/5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs uppercase tracking-widest text-luxury-gold font-medium">
+                            Enable WhatsApp Business Hours
+                          </label>
+                          <label className="flex items-center cursor-pointer">
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={whatsappHoursEnabled}
+                                onChange={(e) => setWhatsappHoursEnabled(e.target.checked)}
+                              />
+                              <div className={`block w-10 h-6 rounded-full transition-colors ${whatsappHoursEnabled ? 'bg-[#cfb53b]' : 'bg-white/10'}`}></div>
+                              <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${whatsappHoursEnabled ? 'transform translate-x-4' : ''}`}></div>
+                            </div>
+                          </label>
+                        </div>
+
+                        {whatsappHoursEnabled && (
+                          <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest text-luxury-cream/40">Start Time</label>
+                                <input
+                                  type="time"
+                                  value={whatsappHoursStart}
+                                  onChange={(e) => setWhatsappHoursStart(e.target.value)}
+                                  className="w-full bg-[#0a0910] border border-white/5 rounded-2xl px-6 py-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold/40 transition-all font-mono"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest text-luxury-cream/40">End Time</label>
+                                <input
+                                  type="time"
+                                  value={whatsappHoursEnd}
+                                  onChange={(e) => setWhatsappHoursEnd(e.target.value)}
+                                  className="w-full bg-[#0a0910] border border-white/5 rounded-2xl px-6 py-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold/40 transition-all font-mono"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-[10px] uppercase tracking-widest text-luxury-cream/40 block">Active Days</label>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName, idx) => {
+                                  const isActive = whatsappDays.includes(idx);
+                                  return (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => {
+                                        if (isActive) {
+                                          setWhatsappDays(whatsappDays.filter(d => d !== idx));
+                                        } else {
+                                          setWhatsappDays([...whatsappDays, idx].sort());
+                                        }
+                                      }}
+                                      className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                                        isActive
+                                          ? "bg-[#cfb53b]/10 text-[#cfb53b] border-[#cfb53b]/30 cursor-pointer"
+                                          : "bg-[#0a0910] text-zinc-500 border-white/5 hover:border-white/10 cursor-pointer"
+                                      }`}
+                                    >
+                                      {dayName}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-[10px] uppercase tracking-widest text-luxury-cream/40">"We are Away" Custom Tooltip Message</label>
+                              <textarea
+                                value={whatsappAwayMessage}
+                                onChange={(e) => setWhatsappAwayMessage(e.target.value)}
+                                rows={2}
+                                placeholder="e.g. We are currently away. We'll respond as soon as we're back!"
+                                className="w-full bg-[#0a0910] border border-white/5 rounded-2xl px-6 py-4 text-sm text-luxury-cream focus:outline-none focus:border-luxury-gold/40 transition-all resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1205,6 +1621,10 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             <LeadManager />
           ) : activeTab === "wayfic_forms" ? (
             <WayficFormsManager />
+          ) : activeTab === "live_sessions" ? (
+            <LiveSessionsManager />
+          ) : activeTab === "qa_automation" ? (
+            <AutomationTestManager />
           ) : (
             <StudioManager />
           )}
@@ -1340,6 +1760,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               {[
                 { id: "assets", label: "Asset Manager", icon: Folder },
                 { id: "activity", label: "Activity Log", icon: Activity },
+                { id: "live_sessions", label: "Live Sessions", icon: Activity },
                 { id: "navigation", label: "Navigation", icon: Compass },
                 { id: "database", label: "Database Hub", icon: Database },
                 { id: "general", label: "Settings", icon: Settings },
@@ -1498,6 +1919,137 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                 Sign Out
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* GOOGLE AUTHENTICATOR (2FA) SETUP / DISABLE MODAL */}
+      {isTwoFactorSetupOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200 text-left">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-[#0e0c15] border border-white/5 rounded-3xl p-6 relative shadow-2xl space-y-6"
+          >
+            <button 
+              onClick={() => {
+                setIsTwoFactorSetupOpen(false);
+                setSetupError("");
+                setSetupCode("");
+              }}
+              className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1.5 text-center pt-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 mx-auto">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                {hasTwoFactor ? "Two-Factor Protection Active" : "Setup Google Authenticator"}
+              </h3>
+              <p className="text-[10px] text-zinc-500 font-medium font-mono">Securing {user?.email}</p>
+            </div>
+
+            {hasTwoFactor ? (
+              // If already enabled, show "Disable" workflow
+              <form onSubmit={handleDisable2FA} className="space-y-4">
+                <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-2xl text-xs space-y-2 text-emerald-400">
+                  <p className="font-bold uppercase tracking-wider">MFA Protection is Enabled</p>
+                  <p className="text-zinc-400 font-normal leading-relaxed">
+                    Your account is fully hardened against unauthorized logins. To deactivate this security layer, you must enter your current Google Authenticator verification token.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-[#cfb53b] font-mono block text-center">Verify Current Code</label>
+                  <input 
+                    type="text"
+                    required
+                    maxLength={6}
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    value={setupCode}
+                    onChange={(e) => setSetupCode(e.target.value)}
+                    placeholder="000000"
+                    className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-lg text-center font-mono text-luxury-cream focus:outline-none focus:border-red-500/40 transition-all tracking-[0.3em]"
+                    autoFocus
+                  />
+                </div>
+
+                {setupError && (
+                  <p className="text-red-400 text-[10px] text-center font-bold uppercase tracking-widest">{setupError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={setupLoading}
+                  className="w-full py-3.5 bg-red-500/10 hover:bg-red-500 border border-red-500/20 hover:text-white text-red-400 font-semibold rounded-2xl transition-all duration-300 tracking-widest uppercase text-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {setupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  <span>Deactivate 2FA Shield</span>
+                </button>
+              </form>
+            ) : (
+              // Setup new 2FA workflow
+              <form onSubmit={handleEnable2FA} className="space-y-5">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 bg-white/[0.02] p-3.5 rounded-2xl border border-white/5 text-[11px] leading-relaxed text-zinc-400">
+                    <span className="w-5 h-5 rounded-full bg-[#3b82f6]/10 text-[#3b82f6] flex items-center justify-center font-bold font-mono text-xs shrink-0 mt-0.5">1</span>
+                    <p>Scan this QR code using the **Google Authenticator** app (or any TOTP app) on your mobile device.</p>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-2xl w-48 h-48 mx-auto flex items-center justify-center border border-white/10 shadow-inner">
+                    <img 
+                      src={setupQRUrl} 
+                      alt="Google Authenticator QR Code" 
+                      className="w-44 h-44 object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+
+                  <div className="space-y-1 bg-white/[0.01] border border-white/5 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Can't scan the QR? Enter manually:</p>
+                    <code className="text-xs text-luxury-gold font-mono tracking-widest select-all block py-1 uppercase">{setupSecret}</code>
+                  </div>
+
+                  <div className="flex items-start gap-3 bg-white/[0.02] p-3.5 rounded-2xl border border-white/5 text-[11px] leading-relaxed text-zinc-400">
+                    <span className="w-5 h-5 rounded-full bg-[#3b82f6]/10 text-[#3b82f6] flex items-center justify-center font-bold font-mono text-xs shrink-0 mt-0.5">2</span>
+                    <p>Enter the 6-digit confirmation token shown in your authenticator app below to complete setup.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-[#cfb53b] font-mono block text-center">6-Digit Code</label>
+                  <input 
+                    type="text"
+                    required
+                    maxLength={6}
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    value={setupCode}
+                    onChange={(e) => setSetupCode(e.target.value)}
+                    placeholder="000000"
+                    className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-lg text-center font-mono text-luxury-cream focus:outline-none focus:border-luxury-gold/40 transition-all tracking-[0.3em]"
+                    autoFocus
+                  />
+                </div>
+
+                {setupError && (
+                  <p className="text-red-400 text-[10px] text-center font-bold uppercase tracking-widest">{setupError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={setupLoading}
+                  className="w-full py-3.5 bg-luxury-gold hover:bg-luxury-cream text-luxury-black font-semibold rounded-2xl transition-all duration-300 tracking-widest uppercase text-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {setupLoading ? <Loader2 className="w-4 h-4 animate-spin text-luxury-black" /> : null}
+                  <span>Activate 2FA Security</span>
+                </button>
+              </form>
+            )}
           </motion.div>
         </div>
       )}

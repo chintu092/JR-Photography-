@@ -10,11 +10,19 @@ export interface CustomUser {
   isCustomAuth?: boolean;
 }
 
+export interface CustomRole {
+  id: string;
+  name: string;
+  permissions: string[];
+}
+
 interface AuthContextType {
   user: ((User | CustomUser) & { isCustomAuth?: boolean }) | null;
   isAdmin: boolean;
   role: string | null;
   permissions: string[] | null;
+  customRoles: CustomRole[];
+  hasPermission: (role: string | null, permission: string) => boolean;
   loading: boolean;
   isApproved: boolean;
   login: () => Promise<void>;
@@ -22,6 +30,7 @@ interface AuthContextType {
   registerWithCredentials: (email: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -32,8 +41,133 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [permissions, setPermissions] = useState<string[] | null>(null);
   const [isApproved, setIsApproved] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
 
   useEffect(() => {
+    if (isAdmin) {
+      const fetchCustomRoles = async () => {
+        try {
+          const rolesDoc = await getDoc(doc(db, 'settings', 'roles'));
+          if (rolesDoc.exists()) {
+            const data = rolesDoc.data();
+            const rolesArray = Object.keys(data.roles || {}).map(id => ({
+              id,
+              name: data.roles[id].name,
+              permissions: data.roles[id].permissions || []
+            }));
+            setCustomRoles(rolesArray);
+          }
+        } catch (e) {
+          console.error("Failed to load custom roles:", e);
+        }
+      };
+      // Fetch roles only when user is admin
+      fetchCustomRoles();
+    } else {
+      setCustomRoles([]);
+    }
+  }, [isAdmin]);
+
+  const hasPermission = (checkRole: string | null, permission: string): boolean => {
+    if (!checkRole) return false;
+    if (checkRole === 'super_admin') return true;
+    if (checkRole === 'writer' && permission === 'blog') return true;
+    
+    // Core permissions check
+    if (permissions && permissions.includes("*")) return true;
+    
+    const roleConfig = customRoles.find(r => r.id === checkRole);
+    if (roleConfig) {
+      return roleConfig.permissions.includes(permission);
+    }
+    
+    // For assigned explicit permissions not mapped to custom roles directly 
+    if (permissions && permissions.includes(permission)) {
+       return true;
+    }
+
+    return false;
+  };
+
+  useEffect(() => {
+    // Check for independent Google OAuth success parameters in the URL query string
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('oauth_success') === 'true') {
+        const email = params.get('email')?.toLowerCase().trim() || '';
+        const name = params.get('name') || '';
+        const picture = params.get('picture') || '';
+        
+        if (email) {
+          setLoading(true);
+          // Clear query parameters from URL to keep it pristine and avoid loop issues on refresh
+          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+          window.history.replaceState({ path: newUrl }, '', newUrl);
+
+          const authenticateOAuthUser = async () => {
+            try {
+              let matchedAdmin: any = null;
+              
+              if (email === 'supriyos9@gmail.com') {
+                matchedAdmin = {
+                  email: 'supriyos9@gmail.com',
+                  name: name || 'Supriyo (Root Super Admin)',
+                  role: 'super_admin',
+                  permissions: ['*'],
+                  approved: true
+                };
+              } else {
+                const { getCollectionData } = await import('../lib/db-client');
+                const admins = await getCollectionData<any>('admins');
+                matchedAdmin = admins.find(a => a.email?.toLowerCase().trim() === email);
+                
+                if (!matchedAdmin) {
+                  // Auto-register new admin using DB-agnostic save helper
+                  matchedAdmin = {
+                    email: email,
+                    name: name || email,
+                    role: 'writer',
+                    permissions: ['blog'],
+                    approved: false,
+                    addedAt: new Date().toISOString(),
+                    addedBy: 'self_registration_independent_google'
+                  };
+                  
+                  const { saveDocument } = await import('../lib/db-client');
+                  await saveDocument('admins', email, matchedAdmin);
+                }
+              }
+
+              const customUser = {
+                uid: 'google_oauth_' + email.replace(/[^a-zA-Z0-9]/g, '_'),
+                email,
+                displayName: name || matchedAdmin.name || email,
+                photoURL: picture,
+                isCustomAuth: true,
+                role: matchedAdmin.role || 'writer',
+                permissions: matchedAdmin.permissions || ['blog'],
+                approved: matchedAdmin.approved !== false
+              };
+
+              localStorage.setItem('custom_admin_user', JSON.stringify(customUser));
+              setUser(customUser);
+              setIsAdmin(true);
+              setRole(customUser.role);
+              setPermissions(customUser.permissions);
+              setIsApproved(customUser.approved);
+            } catch (err) {
+              console.error("Failed to authenticate independent Google OAuth user:", err);
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          authenticateOAuthUser();
+          return;
+        }
+      }
+    }
+
     // Check if there is a custom logged in user in localStorage first
     const savedCustomUser = localStorage.getItem('custom_admin_user');
     if (savedCustomUser) {
@@ -55,6 +189,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedCustomUser) {
         try {
           const parsed = JSON.parse(savedCustomUser);
+          
+          // Independent Google Auth users bypass Firebase authentication lifecycle entirely
+          if (parsed.uid && parsed.uid.startsWith('google_oauth_')) {
+            setUser(parsed);
+            setIsAdmin(true);
+            setRole(parsed.role || 'sub_admin');
+            setPermissions(parsed.permissions || ['blog']);
+            setIsApproved(parsed.approved !== false);
+            setLoading(false);
+            return;
+          }
+
           if (!fbUser) {
             console.log("[Auth Restoration] fbUser is null, attempting silent email/password re-auth...");
             // Silent re-auth securely to restore a valid Firebase session using the deterministic password
@@ -318,6 +464,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async () => {
     localStorage.removeItem('custom_admin_user');
+    try {
+      const res = await fetch('/api/auth/google/url');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Independent Google Auth URL fetch failed, falling back to standard Firebase login popup:", e);
+    }
+
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   };
@@ -450,7 +609,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, role, permissions, loading, isApproved, login, loginWithCredentials, registerWithCredentials, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, role, permissions, customRoles, hasPermission, loading, isApproved, login, loginWithCredentials, registerWithCredentials, logout }}>
       {children}
     </AuthContext.Provider>
   );

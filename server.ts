@@ -42,6 +42,53 @@ async function startServer() {
     console.error("[Firebase Server Setup] Failed to build Firestore reference:", error);
   }
 
+  function escapeMongoURI(uri: string): string {
+    if (!uri) return uri;
+    try {
+      const protocolMatch = uri.match(/^(mongodb(?:\+srv)?:\/\/)(.*)$/);
+      if (!protocolMatch) return uri;
+      const [_, protocol, rest] = protocolMatch;
+      
+      const lastAtIndex = rest.lastIndexOf('@');
+      if (lastAtIndex === -1) {
+        return uri;
+      }
+      
+      const userinfo = rest.substring(0, lastAtIndex);
+      const hostAndRest = rest.substring(lastAtIndex + 1);
+      
+      const firstColonIndex = userinfo.indexOf(':');
+      if (firstColonIndex === -1) {
+        let decoded = userinfo;
+        try {
+          decoded = decodeURIComponent(userinfo);
+        } catch (_) {}
+        return protocol + encodeURIComponent(decoded) + '@' + hostAndRest;
+      }
+      
+      const username = userinfo.substring(0, firstColonIndex);
+      const password = userinfo.substring(firstColonIndex + 1);
+      
+      let decodedUsername = username;
+      try {
+        decodedUsername = decodeURIComponent(username);
+      } catch (_) {}
+      
+      let decodedPassword = password;
+      try {
+        decodedPassword = decodeURIComponent(password);
+      } catch (_) {}
+      
+      const safeUsername = encodeURIComponent(decodedUsername);
+      const safePassword = encodeURIComponent(decodedPassword);
+      
+      return protocol + safeUsername + ':' + safePassword + '@' + hostAndRest;
+    } catch (err) {
+      console.warn("Failed to automatically escape MongoDB URI:", err);
+      return uri;
+    }
+  }
+
   function unwrapFirestoreFields(fields: any): any {
     if (!fields) return {};
     const result: any = {};
@@ -140,8 +187,9 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "Connection String is required for MongoDB." });
       }
       try {
+        const escapedConnectionString = escapeMongoURI(connectionString);
         const { MongoClient } = await import("mongodb");
-        const client = new MongoClient(connectionString, { serverSelectionTimeoutMS: 5000 });
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
         await client.connect();
         
         // Fetch databases to check authorization
@@ -203,6 +251,41 @@ async function startServer() {
     return res.status(400).json({ success: false, message: "Invalid database type" });
   });
 
+  // Fetch collection counts for MongoDB
+  app.post("/api/database/mongodb/counts", async (req: any, res: any) => {
+    const { connectionString, database, collections } = req.body;
+    if (!connectionString) {
+      return res.status(400).json({ success: false, message: "Connection string is required." });
+    }
+    try {
+      const escapedConnectionString = escapeMongoURI(connectionString);
+      const { MongoClient } = await import("mongodb");
+      const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
+      await client.connect();
+      
+      const parsedUrl = new URL(escapedConnectionString);
+      const dbName = database || parsedUrl.pathname.replace("/", "") || "jrphotography";
+      const dbInstance = client.db(dbName);
+      
+      const counts: { [key: string]: number } = {};
+      const cols = Array.isArray(collections) ? collections : [];
+      for (const colName of cols) {
+        try {
+          const count = await dbInstance.collection(colName).countDocuments();
+          counts[colName] = count;
+        } catch (e) {
+          counts[colName] = 0;
+        }
+      }
+      
+      await client.close();
+      return res.json({ success: true, counts });
+    } catch (err: any) {
+      console.error("Failed to fetch MongoDB collection counts:", err);
+      return res.json({ success: false, message: err.message });
+    }
+  });
+
   // Query database in sandbox console
   app.post("/api/database/query", async (req: any, res: any) => {
     const { type, config, query } = req.body;
@@ -216,12 +299,13 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "Connection string is required." });
       }
       try {
+        const escapedConnectionString = escapeMongoURI(connectionString);
         const { MongoClient } = await import("mongodb");
-        const client = new MongoClient(connectionString, { serverSelectionTimeoutMS: 5000 });
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
         await client.connect();
         
         // Selected database
-        const parsedUrl = new URL(connectionString);
+        const parsedUrl = new URL(escapedConnectionString);
         const dbName = database || parsedUrl.pathname.replace("/", "") || "test";
         const dbInstance = client.db(dbName);
         
@@ -295,12 +379,13 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "MongoDB Connection string is required." });
       }
       try {
+        const escapedConnectionString = escapeMongoURI(connectionString);
         const { MongoClient } = await import("mongodb");
-        const client = new MongoClient(connectionString, { serverSelectionTimeoutMS: 5000 });
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
         await client.connect();
         
         // Define DB
-        const parsedUrl = new URL(connectionString);
+        const parsedUrl = new URL(escapedConnectionString);
         const dbName = database || parsedUrl.pathname.replace("/", "") || "jrphotography";
         const dbInstance = client.db(dbName);
         
@@ -563,11 +648,12 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "MongoDB connection string is required." });
       }
       try {
+        const escapedConnectionString = escapeMongoURI(connectionString);
         const { MongoClient } = await import("mongodb");
-        const client = new MongoClient(connectionString, { serverSelectionTimeoutMS: 5000 });
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
         await client.connect();
 
-        const parsedUrl = new URL(connectionString);
+        const parsedUrl = new URL(escapedConnectionString);
         const dbName = database || parsedUrl.pathname.replace("/", "") || "jrphotography";
         const dbInstance = client.db(dbName);
 
@@ -695,6 +781,94 @@ async function startServer() {
     }
   });
 
+  // Get active database configuration
+  app.get("/api/database/active", async (req: any, res: any) => {
+    let activeEngine = "firestore";
+    const activeDbPath = path.join(process.cwd(), "active-db.json");
+    try {
+      const fs = await import("fs/promises");
+      const data = await fs.readFile(activeDbPath, "utf-8");
+      const config = JSON.parse(data);
+      activeEngine = config.activeEngine || "firestore";
+    } catch (e) {
+      // Defaults to firestore
+    }
+    return res.json({ activeEngine });
+  });
+
+  // Get Google OAuth URL for Independent Google Authentication
+  app.get("/api/auth/google/url", (req: any, res: any) => {
+    const rawClientId = process.env.VITE_GOOGLE_CLIENT_ID;
+    if (!rawClientId) {
+      return res.json({ url: null });
+    }
+    const clientId = rawClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "");
+    const host = req.get("host") || "";
+    const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
+    const proto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
+    const redirectUri = `${proto}://${host}/api/auth/google/callback`;
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+    return res.json({ url });
+  });
+
+  // Handle Google OAuth Callback
+  app.get("/api/auth/google/callback", async (req: any, res: any) => {
+    const { code } = req.query;
+    if (!code) {
+      return res.redirect("/admin?oauth_error=no_code_provided");
+    }
+    const rawClientId = process.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = rawClientId ? rawClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "") : "";
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const host = req.get("host") || "";
+    const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
+    const proto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
+    const redirectUri = `${proto}://${host}/api/auth/google/callback`;
+    
+    try {
+      // Exchange authorization code for tokens
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code: code as string,
+          client_id: clientId || "",
+          client_secret: clientSecret || "",
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+        }),
+      });
+      
+      if (!tokenRes.ok) {
+        const errorData = await tokenRes.text();
+        throw new Error(`Token exchange failed: ${errorData}`);
+      }
+      
+      const tokens = await tokenRes.json();
+      const accessToken = tokens.access_token;
+      
+      // Fetch user profile from Google UserInfo endpoint
+      const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      
+      if (!userRes.ok) {
+        throw new Error("Failed to fetch Google user info");
+      }
+      
+      const googleUser = await userRes.json();
+      const email = googleUser.email?.toLowerCase().trim();
+      const name = googleUser.name || "";
+      const picture = googleUser.picture || "";
+      
+      // Redirect back to the admin portal with details
+      return res.redirect(`/admin?oauth_success=true&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&picture=${encodeURIComponent(picture)}`);
+    } catch (error: any) {
+      console.error("Google OAuth Callback Error:", error);
+      return res.redirect(`/admin?oauth_error=${encodeURIComponent(error.message || "Auth failed")}`);
+    }
+  });
+
   // Serve public collection content depending on active database engine
   app.get("/api/content/:collectionName", async (req: any, res: any) => {
     const { collectionName } = req.params;
@@ -729,11 +903,12 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "MongoDB connection config is missing." });
       }
       try {
+        const escapedConnectionString = escapeMongoURI(mongoConfig.connectionString);
         const { MongoClient } = await import("mongodb");
-        const client = new MongoClient(mongoConfig.connectionString, { serverSelectionTimeoutMS: 5000 });
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
         await client.connect();
 
-        const parsedUrl = new URL(mongoConfig.connectionString);
+        const parsedUrl = new URL(escapedConnectionString);
         const dbName = mongoConfig.database || parsedUrl.pathname.replace("/", "") || "jrphotography";
         const dbInstance = client.db(dbName);
 
@@ -800,6 +975,243 @@ async function startServer() {
         }
       } catch (err: any) {
         console.error("MySQL content read failed:", err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
+    }
+
+    return res.status(400).json({ success: false, message: "Unsupported database engine." });
+  });
+
+  // Save dynamic collection document depending on active database engine
+  app.post("/api/content/:collectionName/:id", async (req: any, res: any) => {
+    const { collectionName, id } = req.params;
+    const { data } = req.body;
+    
+    if (!data) {
+      return res.status(400).json({ success: false, message: "No data payload provided." });
+    }
+
+    let activeEngine = "firestore";
+    const activeDbPath = path.join(process.cwd(), "active-db.json");
+    try {
+      const fs = await import("fs/promises");
+      const configData = await fs.readFile(activeDbPath, "utf-8");
+      const config = JSON.parse(configData);
+      activeEngine = config.activeEngine || "firestore";
+    } catch (e) {
+      // Ignored, defaults to firestore
+    }
+
+    if (activeEngine === "firestore") {
+      return res.json({ success: true, message: "Success. Firestore is updated client-side." });
+    }
+
+    let dbConfig: any = null;
+    try {
+      const fs = await import("fs/promises");
+      const configData = await fs.readFile(activeDbPath, "utf-8");
+      dbConfig = JSON.parse(configData);
+    } catch (e) {
+      return res.status(500).json({ success: false, message: "Database configuration not found." });
+    }
+
+    if (activeEngine === "mongodb") {
+      const mongoConfig = dbConfig.mongodb;
+      if (!mongoConfig?.connectionString) {
+        return res.status(400).json({ success: false, message: "MongoDB connection config is missing." });
+      }
+      try {
+        const escapedConnectionString = escapeMongoURI(mongoConfig.connectionString);
+        const { MongoClient } = await import("mongodb");
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
+        await client.connect();
+
+        const parsedUrl = new URL(escapedConnectionString);
+        const dbName = mongoConfig.database || parsedUrl.pathname.replace("/", "") || "jrphotography";
+        const dbInstance = client.db(dbName);
+
+        const collection = dbInstance.collection(collectionName);
+        
+        // Prepare document
+        const docCopy = { ...data };
+        docCopy._id = id;
+        docCopy.id = id;
+
+        await collection.replaceOne({ _id: id }, docCopy, { upsert: true });
+
+        await client.close();
+        return res.json({ success: true, message: "Document saved to MongoDB" });
+      } catch (err: any) {
+        console.error("MongoDB content write failed:", err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
+    }
+
+    if (activeEngine === "mysql") {
+      const mysqlConfig = dbConfig.mysql;
+      if (!mysqlConfig?.host || !mysqlConfig?.user || !mysqlConfig?.database) {
+        return res.status(400).json({ success: false, message: "MySQL configuration is missing." });
+      }
+      try {
+        const mysql = await import("mysql2/promise");
+        const connection = await mysql.createConnection({
+          host: mysqlConfig.host,
+          port: mysqlConfig.port ? parseInt(mysqlConfig.port, 10) : 3306,
+          user: mysqlConfig.user,
+          password: mysqlConfig.password || "",
+          database: mysqlConfig.database,
+          connectTimeout: 5000,
+          multipleStatements: true
+        });
+
+        const [tables]: any = await connection.query("SHOW TABLES LIKE ?", [collectionName]);
+        if (!Array.isArray(tables) || tables.length === 0) {
+          await connection.query(`
+            CREATE TABLE \`${collectionName}\` (
+              \`id\` VARCHAR(128) NOT NULL,
+              \`raw_data\` LONGTEXT DEFAULT NULL,
+              PRIMARY KEY (\`id\`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+          `);
+        }
+
+        const [columns]: any = await connection.query(`DESCRIBE \`${collectionName}\``);
+        const colNames = columns.map((c: any) => c.Field);
+
+        const safeItem = data;
+        const rawDataJson = JSON.stringify(safeItem);
+
+        const updateFields: string[] = [];
+        const queryParams: any[] = [];
+
+        const keys = ["id"];
+        const placeholders = ["?"];
+        queryParams.push(id);
+
+        for (const col of colNames) {
+          if (col === "id") continue;
+          if (col === "raw_data") {
+            keys.push("raw_data");
+            placeholders.push("?");
+            queryParams.push(rawDataJson);
+            updateFields.push("`raw_data` = VALUES(`raw_data`)");
+          } else if (col in safeItem) {
+            keys.push(`\`${col}\``);
+            placeholders.push("?");
+            const val = safeItem[col];
+            if (val !== null && val !== undefined) {
+              if (typeof val === "object") {
+                queryParams.push(JSON.stringify(val));
+              } else if (typeof val === "boolean") {
+                queryParams.push(val ? 1 : 0);
+              } else {
+                queryParams.push(val);
+              }
+            } else {
+              queryParams.push(null);
+            }
+            updateFields.push(`\`${col}\` = VALUES(\`${col}\`)`);
+          }
+        }
+
+        const insertSQL = `
+          INSERT INTO \`${collectionName}\` (${keys.join(", ")}) 
+          VALUES (${placeholders.join(", ")}) 
+          ON DUPLICATE KEY UPDATE ${updateFields.join(", ")}
+        `;
+        await connection.query(insertSQL, queryParams);
+
+        await connection.end();
+        return res.json({ success: true, message: "Document saved to MySQL" });
+      } catch (err: any) {
+        console.error("MySQL content write failed:", err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
+    }
+
+    return res.status(400).json({ success: false, message: "Unsupported database engine." });
+  });
+
+  // Delete dynamic collection document depending on active database engine
+  app.delete("/api/content/:collectionName/:id", async (req: any, res: any) => {
+    const { collectionName, id } = req.params;
+
+    let activeEngine = "firestore";
+    const activeDbPath = path.join(process.cwd(), "active-db.json");
+    try {
+      const fs = await import("fs/promises");
+      const configData = await fs.readFile(activeDbPath, "utf-8");
+      const config = JSON.parse(configData);
+      activeEngine = config.activeEngine || "firestore";
+    } catch (e) {
+      // Ignored, defaults to firestore
+    }
+
+    if (activeEngine === "firestore") {
+      return res.json({ success: true, message: "Success. Firestore is updated client-side." });
+    }
+
+    let dbConfig: any = null;
+    try {
+      const fs = await import("fs/promises");
+      const configData = await fs.readFile(activeDbPath, "utf-8");
+      dbConfig = JSON.parse(configData);
+    } catch (e) {
+      return res.status(500).json({ success: false, message: "Database configuration not found." });
+    }
+
+    if (activeEngine === "mongodb") {
+      const mongoConfig = dbConfig.mongodb;
+      if (!mongoConfig?.connectionString) {
+        return res.status(400).json({ success: false, message: "MongoDB connection config is missing." });
+      }
+      try {
+        const escapedConnectionString = escapeMongoURI(mongoConfig.connectionString);
+        const { MongoClient } = await import("mongodb");
+        const client = new MongoClient(escapedConnectionString, { serverSelectionTimeoutMS: 5000 });
+        await client.connect();
+
+        const parsedUrl = new URL(escapedConnectionString);
+        const dbName = mongoConfig.database || parsedUrl.pathname.replace("/", "") || "jrphotography";
+        const dbInstance = client.db(dbName);
+
+        const collection = dbInstance.collection(collectionName);
+
+        await collection.deleteOne({ _id: id });
+
+        await client.close();
+        return res.json({ success: true, message: "Document deleted from MongoDB" });
+      } catch (err: any) {
+        console.error("MongoDB content delete failed:", err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
+    }
+
+    if (activeEngine === "mysql") {
+      const mysqlConfig = dbConfig.mysql;
+      if (!mysqlConfig?.host || !mysqlConfig?.user || !mysqlConfig?.database) {
+        return res.status(400).json({ success: false, message: "MySQL configuration is missing." });
+      }
+      try {
+        const mysql = await import("mysql2/promise");
+        const connection = await mysql.createConnection({
+          host: mysqlConfig.host,
+          port: mysqlConfig.port ? parseInt(mysqlConfig.port, 10) : 3306,
+          user: mysqlConfig.user,
+          password: mysqlConfig.password || "",
+          database: mysqlConfig.database,
+          connectTimeout: 5000
+        });
+
+        const [tables]: any = await connection.query("SHOW TABLES LIKE ?", [collectionName]);
+        if (Array.isArray(tables) && tables.length > 0) {
+          await connection.query(`DELETE FROM \`${collectionName}\` WHERE \`id\` = ?`, [id]);
+        }
+
+        await connection.end();
+        return res.json({ success: true, message: "Document deleted from MySQL" });
+      } catch (err: any) {
+        console.error("MySQL content delete failed:", err);
         return res.status(500).json({ success: false, message: err.message });
       }
     }

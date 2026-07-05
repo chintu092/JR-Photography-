@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Menu, X, ArrowUpRight, Instagram, Dribbble, Sun, Moon } from "lucide-react";
+import { Menu, X, ArrowUpRight, Instagram, Dribbble, Sun, Moon, Volume2, VolumeX } from "lucide-react";
 import { audioService } from "../utils/audio";
 import Logo from "./Logo";
 
@@ -43,10 +43,31 @@ export default function Navbar({
 }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
 
   // Fallback to static if not available
   const displayItems = navConfig !== undefined ? navConfig : NAV_ITEMS;
 
+  useEffect(() => {
+    setIsAudioEnabled(audioService.isSoundEnabled());
+    
+    // Auto-start ambient if enabled. 
+    // If the browser suspends the AudioContext, it will wake up on the first interaction.
+    if (audioService.isSoundEnabled()) {
+       audioService.playAmbient();
+    }
+    
+    // Add a global click listener to resume context if it was suspended
+    const handleFirstInteraction = () => {
+       if (audioService.isSoundEnabled()) {
+           audioService.playAmbient();
+       }
+       document.removeEventListener('click', handleFirstInteraction);
+    };
+    document.addEventListener('click', handleFirstInteraction);
+
+    return () => document.removeEventListener('click', handleFirstInteraction);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,6 +77,15 @@ export default function Navbar({
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const toggleAudio = () => {
+    const newState = !isAudioEnabled;
+    setIsAudioEnabled(newState);
+    audioService.setSoundEnabled(newState);
+    if (newState) {
+      audioService.playClick();
+    }
+  };
 
   const handleNavClick = (e: React.MouseEvent, pageId: string) => {
     e.preventDefault();
@@ -153,13 +183,24 @@ export default function Navbar({
             })}
           </nav>
 
-          {/* CTA Link - Inquire Now & Theme Toggle */}
+          {/* CTA Link - Inquire Now & Controls */}
           <motion.div 
-            className="hidden lg:flex items-center space-x-4"
+            className="hidden lg:flex items-center space-x-3"
             initial={{ opacity: 0, x: 15 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.75, ease: "easeOut" }}
           >
+            {/* Audio Toggle Button */}
+            <button
+               onClick={toggleAudio}
+               onMouseEnter={handleHover}
+               className="p-2.5 rounded-full border border-white/10 hover:bg-white/5 text-luxury-cream hover:text-luxury-gold transition-colors relative group"
+               aria-label={isAudioEnabled ? "Mute Ambient Sound" : "Enable Ambient Sound"}
+            >
+               {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-white/40" />}
+               <span className="sr-only">Toggle Sound</span>
+            </button>
+
             {/* Theme Toggle Button */}
             <button
                onClick={() => {
@@ -292,17 +333,29 @@ export default function Navbar({
                 >
                   <Dribbble className="w-4 h-4" />
                 </a>
-                <button
-                  onClick={() => {
-                    audioService.playClick();
-                    onToggleTheme();
-                  }}
-                  onMouseEnter={handleHover}
-                  className="p-2.5 rounded-full bg-white/5 text-luxury-cream hover:bg-luxury-gold/15 hover:text-luxury-gold transition-colors ml-auto"
-                  aria-label="Toggle Theme"
-                >
-                  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                </button>
+                
+                <div className="flex space-x-2 ml-auto">
+                  <button
+                    onClick={toggleAudio}
+                    onMouseEnter={handleHover}
+                    className="p-2.5 rounded-full bg-white/5 text-luxury-cream hover:bg-luxury-gold/15 hover:text-luxury-gold transition-colors"
+                    aria-label={isAudioEnabled ? "Mute Ambient Sound" : "Enable Ambient Sound"}
+                  >
+                    {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-white/40" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      audioService.playClick();
+                      onToggleTheme();
+                    }}
+                    onMouseEnter={handleHover}
+                    className="p-2.5 rounded-full bg-white/5 text-luxury-cream hover:bg-luxury-gold/15 hover:text-luxury-gold transition-colors"
+                    aria-label="Toggle Theme"
+                  >
+                    {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <p className="text-[10px] font-mono text-luxury-gray uppercase tracking-widest">
                 Kolkata • India • Worldwide

@@ -55,7 +55,8 @@ service cloud.firestore {
 
     function isValidSEOSettings(data) {
       return data.keys().hasAll(['siteName', 'defaultTitle', 'titleTemplate', 'defaultDescription', 'canonicalUrl', 'defaultOgImage', 'updatedAt', 'updatedBy']) &&
-             data.keys().hasOnly(['siteName', 'defaultTitle', 'titleTemplate', 'defaultDescription', 'canonicalUrl', 'defaultOgImage', 'twitterHandle', 'updatedAt', 'updatedBy']) &&
+             data.keys().size() <= 9 &&
+             (!('twitterHandle' in data) || data.twitterHandle is string) &&
              data.siteName is string &&
              data.defaultTitle is string &&
              data.titleTemplate is string &&
@@ -186,7 +187,8 @@ service cloud.firestore {
 
     function isValidContactSubmission(data) {
       return data.keys().hasAll(['name', 'email', 'message', 'status', 'createdAt']) &&
-             data.keys().hasOnly(['name', 'email', 'subject', 'message', 'status', 'createdAt']) &&
+             data.keys().size() <= 6 &&
+             (!('subject' in data) || data.subject is string) &&
              data.name is string && data.name.size() <= 256 &&
              data.email is string && data.email.size() <= 256 &&
              data.message is string && data.message.size() <= 10000 &&
@@ -202,6 +204,22 @@ service cloud.firestore {
              data.trafficData is list &&
              data.sources is list &&
              data.updatedAt is timestamp;
+    }
+
+    function isValidActiveSession(data) {
+      return data.keys().hasAll(['id', 'ip', 'deviceType', 'os', 'browser', 'page', 'joinedAt', 'lastActive']) &&
+             data.keys().size() <= 13 &&
+             (!('city' in data) || data.city is string) &&
+             (!('country' in data) || data.country is string) &&
+             (!('org' in data) || data.org is string) &&
+             (!('email' in data) || data.email is string) &&
+             (!('isAdmin' in data) || data.isAdmin is bool) &&
+             data.id is string &&
+             data.ip is string &&
+             data.deviceType is string &&
+             data.os is string &&
+             data.browser is string &&
+             data.page is string;
     }
 
     function isValidHeroSettings(data) {
@@ -399,6 +417,19 @@ service cloud.firestore {
                        incoming().formId is string &&
                        incoming().createdAt is timestamp;
       allow read, write: if isAdmin();
+    }
+
+    // Rules for Active Sessions tracking
+    match /active_sessions/{sessionId} {
+      allow create: if isValidActiveSession(incoming()) && isValidId(sessionId);
+      allow update: if (
+        (isValidActiveSession(incoming()) && isValidId(sessionId)) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['lastActive', 'page', 'email', 'isAdmin', 'ip', 'city', 'country', 'org']) && 
+         incoming().page is string) ||
+        isAdmin()
+      );
+      allow delete: if true;
+      allow read, list: if isAdmin();
     }
   }
 }

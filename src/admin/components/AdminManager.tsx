@@ -54,16 +54,21 @@ interface AdminRecord {
   addedAt?: string;
   addedBy?: string;
   approved?: boolean;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string;
 }
 
+import CustomRolesManager from "./CustomRolesManager";
+
 export default function AdminManager() {
-  const { user, role: currentAdminRole } = useAuth();
+  const { user, role: currentAdminRole, customRoles } = useAuth();
   const toast = useToast();
   const [admins, setAdmins] = useState<AdminRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAdmin, setEditingAdmin] = useState<Partial<AdminRecord> | null>(null);
   const [saving, setSaving] = useState(false);
   const [isNew, setIsNew] = useState(false);
+  const [activeTab, setActiveTab] = useState<"assign" | "roles">("assign");
   const [message, setMessageRaw] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const setMessage = (msg: { type: "success" | "error"; text: string } | null) => {
@@ -126,6 +131,12 @@ export default function AdminManager() {
           if (rec.approved !== undefined) {
             groupedMap[emailKey].approved = rec.approved;
           }
+          if (rec.twoFactorEnabled !== undefined) {
+            groupedMap[emailKey].twoFactorEnabled = rec.twoFactorEnabled;
+          }
+          if (rec.twoFactorSecret) {
+            groupedMap[emailKey].twoFactorSecret = rec.twoFactorSecret;
+          }
         } else {
           groupedMap[emailKey] = {
             documentIds: [rec.docId],
@@ -136,7 +147,9 @@ export default function AdminManager() {
             passcode: rec.passcode || "2026",
             addedAt: rec.addedAt || "",
             addedBy: rec.addedBy || "",
-            approved: rec.approved !== false
+            approved: rec.approved !== false,
+            twoFactorEnabled: !!rec.twoFactorEnabled,
+            twoFactorSecret: rec.twoFactorSecret || ""
           };
         }
       });
@@ -233,7 +246,9 @@ export default function AdminManager() {
         passcode: editingAdmin.passcode || "2026",
         addedAt: editingAdmin.addedAt || new Date().toISOString(),
         addedBy: editingAdmin.addedBy || user?.email || "unknown",
-        approved: editingAdmin.approved !== false
+        approved: editingAdmin.approved !== false,
+        twoFactorEnabled: editingAdmin.twoFactorEnabled || false,
+        twoFactorSecret: editingAdmin.twoFactorSecret || ""
       };
 
       // Save to Firestore.
@@ -257,6 +272,54 @@ export default function AdminManager() {
     } catch (err) {
       console.error(err);
       setMessage({ type: "error", text: "An error occurred while saving. Check your write permissions." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset2FA = async () => {
+    if (!editingAdmin || !editingAdmin.email) return;
+    if (!window.confirm(`Are you sure you want to disable and reset 2FA for ${editingAdmin.name || editingAdmin.email}?`)) {
+      return;
+    }
+    try {
+      setSaving(true);
+      const emailClean = editingAdmin.email.toLowerCase().trim();
+      const payload = {
+        twoFactorEnabled: false,
+        twoFactorSecret: "",
+        twoFactorUpdatedAt: new Date().toISOString()
+      };
+      
+      // Write updates to firebase
+      await setDoc(doc(db, "admins", emailClean), payload, { merge: true });
+      const promises = (editingAdmin.documentIds || [])
+        .filter(id => id !== emailClean)
+        .map(uid => setDoc(doc(db, "admins", uid), payload, { merge: true }));
+      await Promise.all(promises);
+
+      // Log in Activity log with auto-ID document
+      await setDoc(doc(collection(db, "activity_logs")), {
+        action: "Reset User 2FA",
+        details: `Super Admin ${user?.email} disabled Google Authenticator 2FA for ${editingAdmin.email}.`,
+        category: "Security",
+        createdAt: serverTimestamp(),
+        createdBy: user?.email || "system"
+      });
+
+      setEditingAdmin({
+        ...editingAdmin,
+        twoFactorEnabled: false,
+        twoFactorSecret: ""
+      });
+      setMessage({ type: "success", text: "Two-factor authentication has been successfully reset." });
+      
+      setTimeout(() => {
+        fetchAdmins();
+      }, 1000);
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: "error", text: "Failed to reset 2FA: " + err.message });
     } finally {
       setSaving(false);
     }
@@ -325,7 +388,7 @@ export default function AdminManager() {
             Delegate workspace roles, configure sub-admin tab limits, and enforce granular visual access rules
           </p>
         </div>
-        {!editingAdmin && (
+        {!editingAdmin && activeTab === "assign" && (
           <button
             onClick={handleAddNewClick}
             className="flex items-center gap-2 px-5 py-3 bg-[#846df7] hover:bg-[#6c51ef] text-white rounded-xl text-xs uppercase tracking-widest font-semibold transition-all duration-300 active:scale-95"
@@ -336,6 +399,30 @@ export default function AdminManager() {
         )}
       </div>
 
+      {!editingAdmin && (
+        <div className="flex bg-black/40 border border-white/5 p-1.5 rounded-2xl w-full max-w-sm">
+          <button 
+            onClick={() => setActiveTab('assign')}
+            className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-bold rounded-xl transition-all ${activeTab === 'assign' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white/70'}`}
+          >
+            Assign Roles
+          </button>
+          <button 
+            onClick={() => setActiveTab('roles')}
+            className={`flex-1 py-2 text-[10px] uppercase tracking-widest font-bold rounded-xl transition-all ${activeTab === 'roles' ? 'bg-[#cfb53b]/10 text-[#cfb53b]' : 'text-zinc-500 hover:text-white/70'}`}
+          >
+            Role Configurations
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'roles' && !editingAdmin && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <CustomRolesManager />
+        </motion.div>
+      )}
+
+      {activeTab === 'assign' && (
       <AnimatePresence mode="wait">
         {editingAdmin ? (
           <motion.div
@@ -407,125 +494,45 @@ export default function AdminManager() {
 
               {/* Role Selection */}
               <div className="space-y-3 pt-2">
-                <label className="text-[10px] font-mono uppercase tracking-widest text-luxury-cream/40 block">Administrative Role Tier</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Super Admin selector */}
-                  <div 
-                    onClick={() => {
-                      if (editingAdmin.email === "supriyos9@gmail.com") return;
-                      setEditingAdmin({ ...editingAdmin, role: "super_admin", permissions: ["*"] });
+                <label className="text-[10px] font-mono uppercase tracking-widest text-[#cfb53b] block">Assign Administrative Role</label>
+                <div className="flex flex-col gap-1">
+                  <select
+                    disabled={editingAdmin.email === "supriyos9@gmail.com"}
+                    value={editingAdmin.role || "sub_admin"}
+                    onChange={(e) => {
+                       const value = e.target.value;
+                       if (value === "super_admin") {
+                          setEditingAdmin({ ...editingAdmin, role: "super_admin", permissions: ["*"] });
+                       } else if (value === "sub_admin") {
+                          setEditingAdmin({ ...editingAdmin, role: "sub_admin", permissions: ["hero", "portfolio", "blog"] });
+                       } else if (value === "writer") {
+                          setEditingAdmin({ ...editingAdmin, role: "writer", permissions: ["blog"] });
+                       } else {
+                          const customMatched = customRoles.find(r => r.id === value);
+                          setEditingAdmin({ ...editingAdmin, role: value, permissions: customMatched?.permissions || [] });
+                       }
                     }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                      editingAdmin.role === "super_admin" 
-                        ? "bg-[#100d1c] border-[#846df7]/40 shadow-lg shadow-[#846df7]/5" 
-                        : "bg-black/20 border-white/5 hover:border-white/10"
-                    } ${editingAdmin.email === "supriyos9@gmail.com" ? "cursor-not-allowed opacity-80" : ""}`}
+                    className="w-full bg-[#0a0710] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#cfb53b]/50 disabled:opacity-50 appearance-none font-semibold uppercase tracking-wider disabled:cursor-not-allowed"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 shrink-0 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
-                        <ShieldCheck className="w-4 h-4 text-orange-400" />
-                      </div>
-                      <h4 className="text-xs font-semibold text-white tracking-wide">Super Admin</h4>
-                    </div>
-                    <p className="text-[11px] text-luxury-cream/40 leading-normal mt-1 text-left">
-                      Unrestricted global layout access. Authorize credentials & manage systems.
-                    </p>
-                  </div>
-
-                  {/* Sub Admin selector */}
-                  <div 
-                    onClick={() => {
-                      if (editingAdmin.email === "supriyos9@gmail.com") return;
-                      // default permissions
-                      setEditingAdmin({ 
-                        ...editingAdmin, 
-                        role: "sub_admin", 
-                        permissions: ["hero", "portfolio", "blog"] 
-                      });
-                    }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                      editingAdmin.role === "sub_admin" 
-                        ? "bg-[#0d101a] border-[#3b82f6]/40 shadow-lg shadow-blue-950/5" 
-                        : "bg-black/20 border-white/5 hover:border-white/10"
-                    } ${editingAdmin.email === "supriyos9@gmail.com" ? "cursor-not-allowed opacity-80" : ""}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 shrink-0 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                        <Shield className="w-4 h-4 text-blue-400" />
-                      </div>
-                      <h4 className="text-xs font-semibold text-white tracking-wide">Sub Admin</h4>
-                    </div>
-                    <p className="text-[11px] text-luxury-cream/40 leading-normal mt-1 text-left">
-                      Custom granular dashboard view access. Excluded from core settings & databases.
-                    </p>
-                  </div>
-
-                  {/* Author selector */}
-                  <div 
-                    onClick={() => {
-                      if (editingAdmin.email === "supriyos9@gmail.com") return;
-                      setEditingAdmin({ 
-                        ...editingAdmin, 
-                        role: "writer", 
-                        permissions: ["blog"] 
-                      });
-                    }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                      editingAdmin.role === "writer" 
-                        ? "bg-[#0d1a12] border-emerald-500/40 shadow-lg shadow-emerald-950/5" 
-                        : "bg-black/20 border-white/5 hover:border-white/10"
-                    } ${editingAdmin.email === "supriyos9@gmail.com" ? "cursor-not-allowed opacity-80" : ""}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 shrink-0 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-505/20">
-                        <FileText className="w-4 h-4 text-emerald-400" />
-                      </div>
-                      <h4 className="text-xs font-semibold text-white tracking-wide">Author (Blog)</h4>
-                    </div>
-                    <p className="text-[11px] text-luxury-cream/40 leading-normal mt-1 text-left">
-                      Allowed ONLY blog content menu options. Excluded from editing others' articles.
-                    </p>
-                  </div>
-
-                  {/* Custom Role selector */}
-                  <div 
-                    onClick={() => {
-                      if (editingAdmin.email === "supriyos9@gmail.com") return;
-                      if (['super_admin', 'sub_admin', 'writer'].includes(editingAdmin.role || "")) {
-                         setEditingAdmin({ 
-                           ...editingAdmin, 
-                           role: "custom_role", 
-                           permissions: ["dashboard"] 
-                         });
-                      }
-                    }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                      !['super_admin', 'sub_admin', 'writer'].includes(editingAdmin.role || "")
-                        ? "bg-[#1a0f18] border-pink-500/40 shadow-lg shadow-pink-950/5" 
-                        : "bg-black/20 border-white/5 hover:border-white/10"
-                    } ${editingAdmin.email === "supriyos9@gmail.com" ? "cursor-not-allowed opacity-80" : ""}`}
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="w-8 h-8 shrink-0 rounded-xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20">
-                        <Users className="w-4 h-4 text-pink-400" />
-                      </div>
-                      {!['super_admin', 'sub_admin', 'writer'].includes(editingAdmin.role || "") ? (
-                        <input 
-                          type="text" 
-                          placeholder="Role Title"
-                          value={editingAdmin.role === "custom_role" ? "" : editingAdmin.role}
-                          onChange={(e) => setEditingAdmin({ ...editingAdmin, role: e.target.value })}
-                          className="bg-black/20 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-semibold text-white tracking-wide w-full outline-none focus:border-pink-500/50"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <h4 className="text-xs font-semibold text-white tracking-wide">Custom Role</h4>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-luxury-cream/40 leading-normal mt-1 text-left">
-                      Define a tailored role title and explicitly pick permitted navigation modules.
-                    </p>
-                  </div>
+                     <optgroup label="System Basics">
+                       <option value="super_admin">Super Admin (All Access)</option>
+                       <option value="sub_admin">Sub Admin (Standard)</option>
+                       <option value="writer">Author (Blog Only)</option>
+                     </optgroup>
+                     {customRoles.length > 0 && (
+                       <optgroup label="Custom Roles">
+                         {customRoles.map(cr => (
+                           <option key={cr.id} value={cr.id}>{cr.name}</option>
+                         ))}
+                       </optgroup>
+                     )}
+                     {!['super_admin', 'sub_admin', 'writer'].includes(editingAdmin.role || "") && !customRoles.find(c => c.id === editingAdmin.role) && (
+                       <optgroup label="Legacy Custom Role">
+                         <option value={editingAdmin.role}>{editingAdmin.role?.replace('_', ' ')}</option>
+                       </optgroup>
+                     )}
+                  </select>
+                  <p className="text-[10px] text-zinc-500 font-sans mt-1">Assign a configured role to immediately grant permissions. Manage custom roles in the Role Configurations tab.</p>
                 </div>
               </div>
 
@@ -549,6 +556,39 @@ export default function AdminManager() {
                   >
                     {editingAdmin.approved !== false ? "Approved & Active" : "Pending / Inactive"}
                   </button>
+                </div>
+              )}
+
+              {/* Google Authenticator (2FA) Reset panel */}
+              {editingAdmin && !isNew && (
+                <div className="p-5 rounded-2xl border border-white/5 bg-black/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-0.5 text-left">
+                    <h4 className="text-xs font-semibold text-white tracking-wide flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      Two-Factor Authentication (MFA)
+                    </h4>
+                    <p className="text-[11px] text-luxury-cream/40 leading-normal">
+                      Configure or reset Google Authenticator protection. If this administrator is locked out or loses their device, you can clear their 2FA settings to restore standard login.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2.5 py-1.5 rounded-xl text-[10px] uppercase font-mono font-bold tracking-wider ${
+                      editingAdmin.twoFactorEnabled 
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" 
+                        : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/15"
+                    }`}>
+                      {editingAdmin.twoFactorEnabled ? "2FA Active" : "2FA Off"}
+                    </span>
+                    {editingAdmin.twoFactorEnabled && (
+                      <button
+                        type="button"
+                        onClick={handleReset2FA}
+                        className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/15 rounded-xl text-[10px] uppercase font-bold tracking-widest transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        Reset / Disable 2FA
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -701,10 +741,15 @@ export default function AdminManager() {
                                 <FileText className="w-3.5 h-3.5 text-emerald-400" />
                                 Author
                               </span>
-                            ) : (
+                            ) : adm.role === "sub_admin" ? (
                               <span className="px-2.5 py-1 bg-[#846df7]/10 border border-[#846df7]/20 text-[#846df7] rounded-lg text-[9px] uppercase font-bold tracking-widest flex items-center gap-1.5 shadow-sm font-mono">
                                 <Shield className="w-3.5 h-3.5" />
-                                {adm.role ? adm.role.replace('_', ' ') : "Sub Admin"}
+                                Sub Admin
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 bg-pink-500/10 border border-pink-500/20 text-pink-400 rounded-lg text-[9px] uppercase font-bold tracking-widest flex items-center gap-1.5 shadow-sm font-mono">
+                                <Users className="w-3.5 h-3.5" />
+                                {customRoles.find(c => c.id === adm.role)?.name || adm.role?.replace('_', ' ')}
                               </span>
                             )}
                           </div>
@@ -742,11 +787,27 @@ export default function AdminManager() {
                           </div>
                         )}
 
-                        <div className="pt-2 flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Security Passcode:</span>
-                          <span className="text-xs bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded border border-orange-500/20 font-mono font-bold tracking-wider">
-                            {adm.passcode || "2026"}
-                          </span>
+                        <div className="pt-2 flex flex-wrap items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Security Passcode:</span>
+                            <span className="text-xs bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded border border-orange-500/20 font-mono font-bold tracking-wider">
+                              {adm.passcode || "2026"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Google 2FA:</span>
+                            {adm.twoFactorEnabled ? (
+                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-sans font-bold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                ENABLED
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-zinc-500/10 text-zinc-400 px-2 py-0.5 rounded border border-zinc-500/20 font-sans font-bold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                                DISABLED
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -804,6 +865,7 @@ export default function AdminManager() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
     </section>
   );
 }

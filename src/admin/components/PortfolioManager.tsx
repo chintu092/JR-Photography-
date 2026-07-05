@@ -14,7 +14,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { WorkItem, SEOSettings } from "../../types";
 import { WORK_ITEMS } from "../../data";
-import { getCollectionData } from "../../lib/db-client";
+import { getCollectionData, saveDocument, deleteDocument } from "../../lib/db-client";
 import ImagePreviewInput from "./ImagePreviewInput";
 import SEOAssistantPanel from "./SEOAssistantPanel";
 
@@ -115,7 +115,7 @@ export default function PortfolioManager() {
     try {
       // Setup batch updates
       await Promise.all(updatedItems.map(item => 
-        setDoc(doc(db, "portfolio", item.id), { order: item.order }, { merge: true })
+        saveDocument("portfolio", item.id, { order: item.order })
       ));
       toast.success("Portfolio order saved successfully.");
     } catch (error) {
@@ -273,7 +273,7 @@ export default function PortfolioManager() {
         // Remove id from document data before saving if it was included in JSON
         if (data.id) delete data.id;
 
-        await setDoc(doc(db, "portfolio", generatedId), data);
+        await saveDocument("portfolio", generatedId, data);
         successCount++;
       }));
       toast.success(`Successfully added ${successCount} portfolio items`);
@@ -343,7 +343,7 @@ export default function PortfolioManager() {
       data.createdAt = finalCreatedAt;
 
       // 1. Save standard portfolio card body
-      await setDoc(doc(db, "portfolio", id!), data, { merge: true });
+      await saveDocument("portfolio", id!, data);
 
       // 2. Parallel save nested catalog-level SEO credentials
       const seoData = {
@@ -357,13 +357,13 @@ export default function PortfolioManager() {
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
       };
-      await setDoc(doc(db, "settings", "seo", "pages", `works-detail-${id}`), seoData, { merge: true });
+      await saveDocument("settings_seo_pages", `works-detail-${id}`, seoData);
 
       // If existing item and id changed, delete old one
       if (!isNew && oldId && oldId !== id) {
         try {
-          await deleteDoc(doc(db, "portfolio", oldId));
-          await deleteDoc(doc(db, "settings", "seo", "pages", `works-detail-${oldId}`));
+          await deleteDocument("portfolio", oldId);
+          await deleteDocument("settings_seo_pages", `works-detail-${oldId}`);
         } catch (e) {
           console.warn("Failed to delete outdated old document:", e);
         }
@@ -391,8 +391,8 @@ export default function PortfolioManager() {
     setSaving(true);
     setMessage(null);
     try {
-      await deleteDoc(doc(db, "portfolio", deleteId));
-      await deleteDoc(doc(db, "settings", "seo", "pages", `works-detail-${deleteId}`));
+      await deleteDocument("portfolio", deleteId);
+      await deleteDocument("settings_seo_pages", `works-detail-${deleteId}`);
 
       setItems(prev => prev.filter(i => i.id !== deleteId));
       setMessage({ type: "success", text: "Portfolio item and index configurations removed successfully." });
@@ -421,7 +421,7 @@ export default function PortfolioManager() {
 
       for (const item of WORK_ITEMS) {
         const id = item.id || item.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        await setDoc(doc(db, "portfolio", id), {
+        await saveDocument("portfolio", id, {
           ...item,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -429,7 +429,7 @@ export default function PortfolioManager() {
         });
 
         // Seed basic dynamic portfolio page SEO default coordinates
-        await setDoc(doc(db, "settings", "seo", "pages", `works-detail-${id}`), {
+        await saveDocument("settings_seo_pages", `works-detail-${id}`, {
           title: item.title,
           description: item.description,
           focusKeyword: item.category,

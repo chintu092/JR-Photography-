@@ -32,6 +32,7 @@ import Blog from "./components/Blog";
 import BlogDetail from "./components/BlogDetail";
 import WorkDetail from "./components/WorkDetail";
 import AdminPanel from "./admin/AdminPanel";
+import SessionTracker from "./components/SessionTracker";
 
 // Register ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
@@ -71,6 +72,7 @@ export default function App() {
   const [siteFavicon, setSiteFavicon] = useState<string | null>(null);
   const [brandTextLine1, setBrandTextLine1] = useState<string>("JR");
   const [brandTextLine2, setBrandTextLine2] = useState<string>("PHOTOGRAPHY");
+  const [footerCopyrightText, setFooterCopyrightText] = useState<string>("© {YYYY} JR Photography Studio. All rights reserved globally.");
   const [navigationConfig, setNavigationConfig] = useState<any>(null);
   const [themeColors, setThemeColors] = useState<{
     gold: string;
@@ -117,6 +119,9 @@ export default function App() {
         setSiteFavicon(data.faviconUrl || null);
         setBrandTextLine1(data.brandTextLine1 || "JR");
         setBrandTextLine2(data.brandTextLine2 || "PHOTOGRAPHY");
+        if (data.footerCopyrightText) {
+          setFooterCopyrightText(data.footerCopyrightText);
+        }
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, "settings/general");
@@ -722,6 +727,9 @@ export default function App() {
 
       {!loading && (
         <>
+          {/* Active Session and device/IP live tracker */}
+          <SessionTracker currentPage={currentPage} />
+
           {/* Custom mouse follower ring and dot */}
           <CustomCursor />
           
@@ -757,6 +765,7 @@ export default function App() {
                 logoUrl={siteLogo}
                 exploreConfig={navigationConfig?.footerExploreLinks}
                 legalConfig={navigationConfig?.footerLegalLinks}
+                copyrightText={footerCopyrightText}
               />
             </>
           )}
