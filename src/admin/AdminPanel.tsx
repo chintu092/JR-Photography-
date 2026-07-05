@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, getDiagnosticAuthMessage } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { db } from "../lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
@@ -72,8 +72,13 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
         window.history.replaceState({ path: newUrl }, '', newUrl);
         
         const decodedError = decodeURIComponent(oauthError);
-        setMessage({ type: "error", text: `Google Sign-In failed: ${decodedError}` });
-        toast.error(`Google Sign-In failed: ${decodedError}`);
+        const diagnostic = getDiagnosticAuthMessage(decodedError);
+        setMessage({ 
+          type: "error", 
+          text: `Google Sign-In failed: ${decodedError}`,
+          diagnostic
+        });
+        toast.error(`Google Sign-In failed: ${diagnostic.title}`);
       }
     }
   }, []);
@@ -94,7 +99,11 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     // Defer to centrally managed role permissions schema
     return hasPermission(currentAdminRole, tabId);
   };
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ 
+    type: "success" | "error"; 
+    text: string; 
+    diagnostic?: { title: string; explanation: string; steps: string[] };
+  } | null>(null);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -216,11 +225,18 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
       await login();
     } catch (error: any) {
       console.error("Login error:", error);
+      const rawMsg = error.message || String(error);
       const errText = error.code === 'auth/popup-blocked'
         ? "Sign-in popup was blocked by your browser. Please allow popups for this site."
-        : `Login failed: ${error.message || 'Unknown error'}`;
-      setMessage({ type: "error", text: errText });
-      toast.error(errText);
+        : `Login failed: ${rawMsg}`;
+      
+      const diagnostic = getDiagnosticAuthMessage(rawMsg);
+      setMessage({ 
+        type: "error", 
+        text: errText,
+        diagnostic
+      });
+      toast.error(`Google Sign-In failed: ${diagnostic.title}`);
     } finally {
       setIsLoggingIn(false);
     }
@@ -653,13 +669,39 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className={`p-4 rounded-xl text-center text-xs uppercase tracking-widest font-medium ${
+              className={`p-5 rounded-2xl text-left border ${
                 message.type === "success" 
-                  ? "bg-green-500/10 text-green-400 border border-green-500/20" 
-                  : "bg-red-500/10 text-red-400 border border-red-500/20"
-              }`}
+                  ? "bg-green-500/5 text-green-400 border-green-500/20" 
+                  : "bg-red-500/5 text-red-400 border-red-500/20"
+              } space-y-4`}
             >
-              {message.text}
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h3 className="font-serif text-sm font-semibold tracking-wide text-white uppercase">
+                    {message.diagnostic?.title || (message.type === "success" ? "Success" : "Authentication Failure")}
+                  </h3>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed uppercase tracking-normal">
+                    {message.diagnostic?.explanation || message.text}
+                  </p>
+                </div>
+              </div>
+
+              {message.diagnostic && message.diagnostic.steps && (
+                <div className="bg-black/45 p-4 rounded-xl border border-white/5 space-y-2.5">
+                  <span className="text-[9px] uppercase tracking-widest font-bold text-luxury-gold block">
+                    Actionable Resolution Steps:
+                  </span>
+                  <div className="space-y-2">
+                    {message.diagnostic.steps.map((step, idx) => (
+                      <div key={idx} className="flex gap-2 text-[10px] text-zinc-300 normal-case leading-relaxed">
+                        <span className="text-luxury-gold font-mono shrink-0">▸</span>
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
           <button

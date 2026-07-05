@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { User, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -14,6 +14,100 @@ export interface CustomRole {
   id: string;
   name: string;
   permissions: string[];
+}
+
+export interface AuthDiagnostic {
+  title: string;
+  explanation: string;
+  steps: string[];
+}
+
+export function getDiagnosticAuthMessage(errStr: string): AuthDiagnostic {
+  const normalized = errStr.toLowerCase();
+  
+  if (normalized.includes("unauthorized-domain") || normalized.includes("unauthorized_domain") || normalized.includes("unauthorized domain")) {
+    const currentHost = typeof window !== 'undefined' ? window.location.host : "jr-photography.vercel.app";
+    return {
+      title: "Firebase Unauthorized Domain (auth/unauthorized-domain)",
+      explanation: `The domain "${currentHost}" has not been authorized in your Firebase Project's configuration. Firebase blocks all login popups and redirects from unauthorized domains for security.`,
+      steps: [
+        "1. Open the Firebase Console (https://console.firebase.google.com).",
+        "2. Click on your project -> Build -> Authentication.",
+        "3. Click on the 'Settings' tab in the top horizontal menu.",
+        "4. Click on 'Authorized domains' in the left-hand sub-menu.",
+        `5. Click 'Add domain' and enter exactly: "${currentHost}"`,
+        "6. Click Save and reload this page to try signing in again!"
+      ]
+    };
+  }
+  
+  if (normalized.includes("redirect_uri_mismatch") || normalized.includes("redirect-uri-mismatch")) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : "https://jr-photography.vercel.app";
+    return {
+      title: "Google OAuth Redirect URI Mismatch",
+      explanation: "The redirect URI used by this application does not match the Authorized redirect URIs configured for your Client ID in the Google Cloud Console.",
+      steps: [
+        "1. Open the Google Cloud Console (https://console.cloud.google.com).",
+        "2. Ensure you have selected your correct Google Cloud Project.",
+        "3. Go to APIs & Services -> Credentials in the navigation menu.",
+        "4. Under 'OAuth 2.0 Client IDs', click your Client ID to edit it.",
+        "5. Scroll down to the 'Authorized redirect URIs' section.",
+        `6. Click 'ADD URI' and add exactly: "${origin}/api/auth/google/callback"`,
+        "7. Scroll to the bottom and click 'Save'. Note: It can take Google up to 5 minutes to propagate this update."
+      ]
+    };
+  }
+
+  if (normalized.includes("invalid_client") || normalized.includes("client not found") || normalized.includes("invalid-client")) {
+    return {
+      title: "Invalid Google OAuth Client ID Configuration",
+      explanation: "Google could not verify the provided Client ID or Client Secret. This usually means the Client ID is incorrect, belongs to a different project, or has been deleted.",
+      steps: [
+        "1. Open your project environment settings (Vercel settings, or .env.example).",
+        "2. Check that VITE_GOOGLE_CLIENT_ID matches your Google Cloud Client ID exactly.",
+        "3. Confirm that the Client ID ends with '.apps.googleusercontent.com' and contains no quotes, trailing whitespaces, or line breaks.",
+        "4. Ensure your Google Cloud Project status is active and the credential has not been disabled."
+      ]
+    };
+  }
+
+  if (normalized.includes("403") || normalized.includes("forbidden") || normalized.includes("access_denied")) {
+    return {
+      title: "Google OAuth Access Forbidden (403)",
+      explanation: "Google rejected the authentication request. This is most commonly caused by your OAuth Consent Screen being in 'Testing' mode and not adding your email address to the authorized test users list.",
+      steps: [
+        "1. Open the Google Cloud Console (https://console.cloud.google.com) and navigate to APIs & Services -> OAuth consent screen.",
+        "2. Check if the Publishing status is 'Testing'.",
+        "3. If in Testing, scroll down to the 'Test users' section.",
+        "4. Click 'ADD USERS' and add your Google Email address (e.g., 'supriyos9@gmail.com') and any other administrator accounts.",
+        "5. Save changes and try logging in again."
+      ]
+    };
+  }
+
+  if (normalized.includes("popup-blocked") || normalized.includes("popup_blocked")) {
+    return {
+      title: "Google Sign-In Popup Blocked",
+      explanation: "Your web browser blocked the Firebase Google Authentication popup window from opening.",
+      steps: [
+        "1. Check your browser's address bar or menu for a blocked-popup notification.",
+        "2. Click the popup blocker notification icon.",
+        "3. Choose 'Always allow popups and redirects from this website'.",
+        "4. Click the 'Authenticate with Google' button again to proceed."
+      ]
+    };
+  }
+
+  // Generic fallback with helpful troubleshooting
+  return {
+    title: "Google Sign-In Authorization Issue",
+    explanation: errStr,
+    steps: [
+      "1. Check the browser Console logs (press F12) to view the full detailed error stack trace.",
+      "2. Verify that your Google Cloud Platform (GCP) Credentials match your Firebase and environment setup.",
+      "3. If deployed on Vercel, make sure the Vercel URL is added to both Google OAuth Authorized Redirect URIs AND Firebase Authorized Domains."
+    ]
+  };
 }
 
 interface AuthContextType {
@@ -93,10 +187,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check for independent Google OAuth success parameters in the URL query string
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('oauth_success') === 'true') {
+      const oauthSuccess = params.get('oauth_success');
+      const oauthError = params.get('oauth_error');
+      
+      console.log("[OAuth Handshake Debug] Checking URL parameters on mount:", {
+        url: window.location.href,
+        origin: window.location.origin,
+        hasOauthSuccess: !!oauthSuccess,
+        oauthSuccessValue: oauthSuccess,
+        hasOauthError: !!oauthError,
+        oauthErrorValue: oauthError,
+        allParams: Array.from(params.entries()).map(([k, v]) => `${k}=${k === 'email' ? '***' : v}`)
+      });
+
+      if (oauthSuccess === 'true') {
         const email = params.get('email')?.toLowerCase().trim() || '';
         const name = params.get('name') || '';
         const picture = params.get('picture') || '';
+        
+        console.log("[OAuth Handshake Debug] Successful OAuth redirect query detected on client. User profile details:", {
+          email,
+          name,
+          hasPicture: !!picture
+        });
         
         if (email) {
           setLoading(true);
@@ -463,13 +576,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async () => {
+    console.log("[OAuth Handshake Debug] login() triggered. Clearing previous custom_admin_user session from localStorage...");
     localStorage.removeItem('custom_admin_user');
     
     // 1. Try to initialize Google OAuth directly on the client side using VITE_GOOGLE_CLIENT_ID
     const clientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
+    console.log("[OAuth Handshake Debug] Loaded client-side environment variable VITE_GOOGLE_CLIENT_ID:", {
+      hasValue: !!clientId,
+      length: clientId ? clientId.length : 0,
+      valueExcerpt: clientId ? `${clientId.substring(0, 10)}...${clientId.substring(Math.max(0, clientId.length - 15))}` : "NONE"
+    });
     
     if (!clientId) {
-      console.warn("[OAuth Handshake] Google OAuth Client ID (VITE_GOOGLE_CLIENT_ID) is not configured in the client environment. Attempting to fall back to backend URL...");
+      console.warn("[OAuth Handshake Debug] Google OAuth Client ID (VITE_GOOGLE_CLIENT_ID) is not configured in the client environment. Attempting to fall back to backend URL endpoint /api/auth/google/url...");
     } else {
       const trimmedClientId = clientId.trim();
       let cleanClientId = trimmedClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "");
@@ -478,19 +597,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const hasProtocol = trimmedClientId.includes("://");
       const isPlaceholder = trimmedClientId.toLowerCase().includes("your_") || trimmedClientId.length < 15;
       
+      console.log("[OAuth Handshake Debug] Sanitizing and validating client-side Client ID:", {
+        original: trimmedClientId,
+        cleaned: cleanClientId,
+        hasProtocol,
+        isPlaceholder,
+        hasDomainSuffix
+      });
+      
       if (hasProtocol) {
-        console.warn(`[OAuth Handshake] Cleaned protocol prefix from VITE_GOOGLE_CLIENT_ID: "${trimmedClientId}" -> "${cleanClientId}"`);
+        console.warn(`[OAuth Handshake Debug] Cleaned protocol prefix from VITE_GOOGLE_CLIENT_ID: "${trimmedClientId}" -> "${cleanClientId}"`);
       }
       
       if (isPlaceholder) {
         const errorMsg = "Malformed Google OAuth Configuration: The Client ID is a placeholder and not a valid Google Cloud Client ID.";
-        console.error(`[OAuth Handshake] ${errorMsg}`);
+        console.error(`[OAuth Handshake Debug] ${errorMsg}`);
         throw new Error(errorMsg);
       }
       
       if (!hasDomainSuffix) {
         const errorMsg = `Malformed Google OAuth Configuration: The Client ID "${cleanClientId}" must end with ".apps.googleusercontent.com".`;
-        console.error(`[OAuth Handshake] ${errorMsg}`);
+        console.error(`[OAuth Handshake Debug] ${errorMsg}`);
         throw new Error(errorMsg);
       }
       
@@ -498,48 +625,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const origin = window.location.origin;
         const redirectUri = `${origin}/api/auth/google/callback`;
         
-        console.log(`[OAuth Handshake] Initiating direct client-side Google OAuth redirect:`, {
+        console.log(`[OAuth Handshake Debug] Step 1: Initiating direct client-side Google OAuth redirect:`, {
           clientId: cleanClientId,
-          redirectUri
+          redirectUri,
+          origin,
+          currentHref: window.location.href
         });
 
         const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cleanClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
         
+        console.log(`[OAuth Handshake Debug] Fully constructed redirect URL:`, oauthUrl);
         window.location.href = oauthUrl;
         return;
       } catch (e: any) {
-        console.error("[OAuth Handshake] Client-side direct Google OAuth construction failed, trying backend endpoint:", e);
+        console.error("[OAuth Handshake Debug] Client-side direct Google OAuth construction failed, trying backend endpoint:", e);
       }
     }
 
     // 2. Fallback to API endpoint
     try {
-      console.log("[OAuth Handshake] Attempting backend Google OAuth URL retrieval fallback...");
+      console.log("[OAuth Handshake Debug] Step 2: Attempting backend Google OAuth URL retrieval fallback...");
       const res = await fetch('/api/auth/google/url');
+      console.log("[OAuth Handshake Debug] Fetch request to /api/auth/google/url completed:", {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok
+      });
+      
       if (res.ok) {
         const data = await res.json();
+        console.log("[OAuth Handshake Debug] Received backend OAuth URL response payload:", data);
         if (data.url) {
+          console.log("[OAuth Handshake Debug] Redirecting window to backend-supplied Google OAuth URL:", data.url);
           window.location.href = data.url;
           return;
         } else {
-          console.warn("[OAuth Handshake] Backend returned empty URL, probably because VITE_GOOGLE_CLIENT_ID is missing on the server.");
+          console.warn("[OAuth Handshake Debug] Backend returned empty URL, probably because VITE_GOOGLE_CLIENT_ID is missing on the server.");
         }
       } else {
-        console.warn(`[OAuth Handshake] Backend URL retrieval returned status ${res.status}`);
+        console.warn(`[OAuth Handshake Debug] Backend URL retrieval returned status ${res.status}`);
       }
-    } catch (e) {
-      console.warn("[OAuth Handshake] Independent Google Auth URL fetch failed, trying Firebase popup authentication:", e);
+    } catch (e: any) {
+      console.warn("[OAuth Handshake Debug] Independent Google Auth URL fetch failed:", e);
     }
 
-    // 3. Fallback to Firebase authentication
-    try {
-      console.log("[OAuth Handshake] Initiating Firebase standard popup auth fallback...");
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (e: any) {
-      console.error("[OAuth Handshake] Firebase authentication popup failed:", e);
-      throw new Error(`Google Sign-In handshake failed: ${e.message || e}`);
-    }
+    // Throw detailed error since Firebase fallback has been completely removed per request
+    throw new Error(
+      "Google OAuth 2.0 configuration is missing, invalid, or unreachable. " +
+      "Direct client-side VITE_GOOGLE_CLIENT_ID and backend /api/auth/google/url both failed. " +
+      "Please make sure VITE_GOOGLE_CLIENT_ID is configured in your environments."
+    );
   };
 
   const loginWithCredentials = async (email: string, passcode: string) => {
