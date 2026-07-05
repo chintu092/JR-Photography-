@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import defaultFirebaseConfig from '../../firebase-applet-config.json';
 
@@ -23,7 +22,18 @@ if (typeof window !== 'undefined' && window.localStorage) {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+
+const getSavedCustomUser = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const saved = window.localStorage.getItem('custom_admin_user');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (_) {}
+  }
+  return null;
+};
 
 export enum OperationType {
   CREATE = 'create',
@@ -41,29 +51,18 @@ interface FirestoreErrorInfo {
   authInfo: {
     userId?: string | null;
     email?: string | null;
-    emailVerified?: boolean | null;
     isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
   }
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const customUser = getSavedCustomUser();
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
+      userId: customUser?.uid || null,
+      email: customUser?.email || null,
+      isAnonymous: false,
     },
     operationType,
     path
@@ -74,13 +73,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 export async function logAdminActivity(action: string, details: string, category: string) {
   try {
-    const user = auth.currentUser;
+    const customUser = getSavedCustomUser();
     await addDoc(collection(db, "activity_logs"), {
       action,
       details,
       category,
-      adminEmail: user?.email || "unknown@admin.com",
-      adminUid: user?.uid || "unknown",
+      adminEmail: customUser?.email || "unknown@admin.com",
+      adminUid: customUser?.uid || "unknown",
       createdAt: serverTimestamp(),
     });
   } catch (error) {

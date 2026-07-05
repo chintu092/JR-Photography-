@@ -4,14 +4,15 @@ import {
   GripVertical, Loader2, AlertCircle, ArrowUp, ArrowDown, Star, LayoutGrid, DollarSign, Clock, Hash, Check
 } from "lucide-react";
 import { db } from "../../lib/firebase";
+import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { PricingTier, PlanVariant } from "../../types";
 import { PRICING_PLANS as initialPricingPlans } from "../../data";
-import { auth } from "../../lib/firebase";
 
 export default function PricingManager() {
   const toast = useToast();
+  const { user } = useAuth();
   const [plans, setPlans] = useState<PricingTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,7 +69,7 @@ export default function PricingManager() {
             active: true,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            updatedBy: auth.currentUser?.uid || "system"
+            updatedBy: user?.uid || "system"
           };
           await setDoc(doc(db, "pricing_plans", docId), planWithMeta);
           seededList.push({ id: docId, ...planWithMeta });
@@ -238,7 +239,7 @@ export default function PricingManager() {
         variants: editingItem.variants || [],
         order: editingItem.order !== undefined ? editingItem.order : plans.length,
         updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "system"
+        updatedBy: user?.uid || "system"
       };
 
       const planId = editingItem.id || `p-${Date.now()}`;

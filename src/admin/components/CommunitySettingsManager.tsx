@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { db, auth } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
+import { useAuth } from "../../context/AuthContext";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "../../context/ToastContext";
 import { Loader2, Save, Type, Link as LinkIcon, MessageSquare } from "lucide-react";
@@ -8,6 +9,7 @@ import ImagePreviewInput from "./ImagePreviewInput";
 
 export default function CommunitySettingsManager() {
   const toast = useToast();
+  const { user } = useAuth();
   const [data, setData] = useState({
     titleHeader: "",
     subtitleHeader: "",
@@ -69,7 +71,7 @@ export default function CommunitySettingsManager() {
   };
 
   const handleSave = async () => {
-    if (!auth.currentUser) {
+    if (!user) {
         setMessage({ type: "error", text: "You must be logged in to save." });
         toast.error("You must be logged in to save.");
         return;
@@ -80,7 +82,7 @@ export default function CommunitySettingsManager() {
       await setDoc(doc(db, "settings", "community"), {
         ...data,
         updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser.uid,
+        updatedBy: user.uid,
       });
       setMessage({ type: "success", text: "Community settings updated!" });
       toast.success("Community settings updated successfully!");
