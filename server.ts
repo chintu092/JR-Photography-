@@ -4,7 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc as fsDoc, getDoc as fsGetDoc } from "firebase/firestore";
+import { getFirestore, doc as fsDoc, getDoc as fsGetDoc, setDoc as fsSetDoc } from "firebase/firestore";
 import fs from "fs";
 import { initializeApp as initAdminApp, getApps as getAdminApps, getApp as getAdminApp } from "firebase-admin/app";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
@@ -803,27 +803,68 @@ async function startServer() {
       return res.json({ url: null });
     }
     const clientId = rawClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "");
-    const host = req.get("host") || "";
-    const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
-    const proto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
-    const redirectUri = `${proto}://${host}/api/auth/google/callback`;
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+    
+    // Resolve origin from query parameter or headers
+    let origin = "";
+    if (req.query.origin) {
+      try {
+        const decodedOrigin = decodeURIComponent(req.query.origin as string);
+        if (decodedOrigin.startsWith("http://") || decodedOrigin.startsWith("https://")) {
+          origin = new URL(decodedOrigin).origin;
+        }
+      } catch (_) {}
+    }
+    
+    if (!origin) {
+      const rawHost = req.headers["x-forwarded-host"] || req.get("host") || "";
+      const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+      const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
+      const rawProto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
+      const proto = Array.isArray(rawProto) ? rawProto[0] : rawProto;
+      origin = `${proto}://${host}`;
+    }
+
+    const callbackPath = origin.includes("vercel.app") ? "/api/auth/callback/google" : "/api/auth/google/callback";
+    const redirectUri = `${origin}${callbackPath}`;
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&state=${encodeURIComponent(origin)}`;
     return res.json({ url });
   });
 
   // Handle Google OAuth Callback
-  app.get("/api/auth/google/callback", async (req: any, res: any) => {
-    const { code } = req.query;
+  const handleGoogleCallback = async (req: any, res: any) => {
+    const { code, state } = req.query;
     if (!code) {
       return res.redirect("/admin?oauth_error=no_code_provided");
     }
     const rawClientId = process.env.VITE_GOOGLE_CLIENT_ID;
     const clientId = rawClientId ? rawClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "") : "";
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const host = req.get("host") || "";
-    const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
-    const proto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
-    const redirectUri = `${proto}://${host}/api/auth/google/callback`;
+    
+    // Resolve origin from Google's redirect 'state' query parameter
+    let origin = "";
+    if (state) {
+      try {
+        const decodedState = decodeURIComponent(state as string);
+        if (decodedState.startsWith("http://") || decodedState.startsWith("https://")) {
+          origin = new URL(decodedState).origin;
+        }
+      } catch (e) {
+        console.warn("[OAuth Handshake] Failed to parse origin from state:", e);
+      }
+    }
+
+    // Fallback if state is missing or invalid
+    if (!origin) {
+      const rawHost = req.headers["x-forwarded-host"] || req.get("host") || "";
+      const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+      const isLocal = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("3000");
+      const rawProto = req.headers["x-forwarded-proto"] || (isLocal ? "http" : "https");
+      const proto = Array.isArray(rawProto) ? rawProto[0] : rawProto;
+      origin = `${proto}://${host}`;
+    }
+
+    const callbackPath = origin.includes("vercel.app") ? "/api/auth/callback/google" : "/api/auth/google/callback";
+    const redirectUri = `${origin}${callbackPath}`;
     
     try {
       // Exchange authorization code for tokens
@@ -861,13 +902,250 @@ async function startServer() {
       const name = googleUser.name || "";
       const picture = googleUser.picture || "";
       
-      // Redirect back to the admin portal with details
-      return res.redirect(`/admin?oauth_success=true&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&picture=${encodeURIComponent(picture)}`);
+      let matchedAdmin: any = null;
+      if (dbInstance) {
+        try {
+          const adminDocRef = fsDoc(dbInstance, "admins", email);
+          const adminSnap = await fsGetDoc(adminDocRef);
+          const existingData = adminSnap.exists() ? adminSnap.data() : {};
+          
+          if (email === 'supriyos9@gmail.com') {
+            matchedAdmin = {
+              ...existingData,
+              email: 'supriyos9@gmail.com',
+              name: name || existingData.name || 'Supriyo (Root Super Admin)',
+              role: 'super_admin',
+              permissions: ['*'],
+              approved: true
+            };
+          } else if (adminSnap.exists()) {
+            matchedAdmin = {
+              ...existingData,
+              name: name || existingData.name || email,
+              email: email
+            };
+          } else {
+            matchedAdmin = {
+              email: email,
+              name: name || email,
+              role: 'writer',
+              permissions: ['blog'],
+              approved: false,
+              addedAt: new Date().toISOString(),
+              addedBy: 'self_registration_independent_google'
+            };
+          }
+          
+          if (picture) matchedAdmin.picture = picture;
+          await fsSetDoc(adminDocRef, matchedAdmin, { merge: true });
+        } catch (dbErr) {
+          console.error("[OAuth Handshake] Failed to fetch/create admin doc in Firestore Web SDK:", dbErr);
+        }
+      }
+
+      if (!matchedAdmin) {
+        matchedAdmin = {
+          email: email,
+          name: name || email,
+          role: email === 'supriyos9@gmail.com' ? 'super_admin' : 'writer',
+          permissions: email === 'supriyos9@gmail.com' ? ['*'] : ['blog'],
+          approved: email === 'supriyos9@gmail.com'
+        };
+      }
+
+      // Return HTML page that communicates via postMessage (if in a popup) or redirects (if same window)
+      res.setHeader("Content-Type", "text/html");
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Successful</title>
+          <style>
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              background-color: #0f172a;
+              color: #f8fafc;
+              margin: 0;
+            }
+            .card {
+              text-align: center;
+              padding: 2.5rem;
+              background-color: #1e293b;
+              border-radius: 12px;
+              box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+              max-width: 400px;
+              width: 90%;
+            }
+            h2 {
+              color: #84cc16;
+              margin-top: 0;
+              margin-bottom: 0.75rem;
+              font-size: 1.5rem;
+            }
+            p {
+              color: #94a3b8;
+              font-size: 0.95rem;
+              margin-bottom: 2rem;
+              line-height: 1.5;
+            }
+            .spinner {
+              border: 3px solid #334155;
+              border-top: 3px solid #84cc16;
+              border-radius: 50%;
+              width: 28px;
+              height: 28px;
+              animation: spin 1s linear infinite;
+              margin: 0 auto;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>Google Authentication Successful!</h2>
+            <p>Completing secure handshake with main application...</p>
+            <div class="spinner"></div>
+          </div>
+          <script>
+            const email = ${JSON.stringify(email)};
+            const name = ${JSON.stringify(name)};
+            const picture = ${JSON.stringify(picture)};
+            const role = ${JSON.stringify(matchedAdmin.role)};
+            const permissions = ${JSON.stringify(matchedAdmin.permissions)};
+            const approved = ${JSON.stringify(matchedAdmin.approved)};
+            
+            let messageSent = false;
+            
+            // Try communicating with parent window / opener
+            if (window.opener) {
+              try {
+                window.opener.postMessage({
+                  type: 'OAUTH_AUTH_SUCCESS',
+                  email: email,
+                  name: name,
+                  picture: picture,
+                  role: role,
+                  permissions: permissions,
+                  approved: approved
+                }, '*');
+                messageSent = true;
+                setTimeout(() => {
+                  window.close();
+                }, 800);
+              } catch (e) {
+                console.warn("[OAuth Popup Callback] Failed to postMessage to opener:", e);
+              }
+            }
+            
+            if (!messageSent) {
+              // Direct fallback to redirect if not a popup or postMessage failed
+              const redirectUrl = "/admin?oauth_success=true" + 
+                "&email=" + encodeURIComponent(email) + 
+                "&name=" + encodeURIComponent(name) + 
+                "&picture=" + encodeURIComponent(picture) +
+                "&role=" + encodeURIComponent(role) +
+                "&permissions=" + encodeURIComponent(JSON.stringify(permissions)) +
+                "&approved=" + encodeURIComponent(approved ? "true" : "false");
+              window.location.href = redirectUrl;
+            }
+          </script>
+        </body>
+        </html>
+      `);
     } catch (error: any) {
       console.error("Google OAuth Callback Error:", error);
-      return res.redirect(`/admin?oauth_error=${encodeURIComponent(error.message || "Auth failed")}`);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Failed</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              background-color: #0f172a;
+              color: #f8fafc;
+              margin: 0;
+            }
+            .card {
+              text-align: center;
+              padding: 2.5rem;
+              background-color: #1e293b;
+              border-radius: 12px;
+              box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+              max-width: 450px;
+              width: 90%;
+            }
+            h2 {
+              color: #ef4444;
+              margin-top: 0;
+              margin-bottom: 0.75rem;
+              font-size: 1.5rem;
+            }
+            p {
+              color: #94a3b8;
+              font-size: 0.95rem;
+              margin-bottom: 2rem;
+              line-height: 1.5;
+            }
+            .btn {
+              display: inline-block;
+              background-color: #3b82f6;
+              color: white;
+              padding: 0.75rem 1.5rem;
+              border-radius: 6px;
+              text-decoration: none;
+              font-weight: 500;
+              transition: background-color 0.2s;
+            }
+            .btn:hover {
+              background-color: #2563eb;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>Authentication Failed</h2>
+            <p>Error: ${error.message || "Unknown error during authentication"}</p>
+            <a href="/admin" class="btn" id="close-btn">Return to App</a>
+          </div>
+          <script>
+            if (window.opener) {
+              try {
+                window.opener.postMessage({
+                  type: 'OAUTH_AUTH_FAILURE',
+                  error: ${JSON.stringify(error.message || "Authentication failed")}
+                }, '*');
+                setTimeout(() => {
+                  window.close();
+                }, 2000);
+              } catch (e) {}
+            }
+            document.getElementById("close-btn").addEventListener("click", (e) => {
+              if (window.opener) {
+                e.preventDefault();
+                window.close();
+              }
+            });
+          </script>
+        </body>
+        </html>
+      `);
     }
-  });
+  };
+
+  app.get("/api/auth/google/callback", handleGoogleCallback);
+  app.get("/api/auth/callback/google", handleGoogleCallback);
 
   // Serve public collection content depending on active database engine
   app.get("/api/content/:collectionName", async (req: any, res: any) => {

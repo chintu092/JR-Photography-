@@ -152,6 +152,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
+  const handleGoogleAuthSuccess = async (
+    email: string,
+    name: string,
+    picture: string,
+    role?: string,
+    permissions?: string[],
+    approved?: boolean
+  ) => {
+    try {
+      setLoading(true);
+      
+      const resolvedRole = role || (email === 'supriyos9@gmail.com' ? 'super_admin' : 'writer');
+      const resolvedPermissions = permissions || (email === 'supriyos9@gmail.com' ? ['*'] : ['blog']);
+      const resolvedApproved = approved !== undefined ? approved : (email === 'supriyos9@gmail.com');
+
+      const customUser: CustomUser = {
+        uid: 'google_oauth_' + email.replace(/[^a-zA-Z0-9]/g, '_'),
+        email,
+        displayName: name || email,
+        photoURL: picture,
+        isCustomAuth: true,
+        role: resolvedRole,
+        permissions: resolvedPermissions,
+        approved: resolvedApproved
+      };
+
+      localStorage.setItem('custom_admin_user', JSON.stringify(customUser));
+      setUser(customUser);
+      setIsAdmin(true);
+      setRole(resolvedRole);
+      setPermissions(resolvedPermissions);
+      setIsApproved(resolvedApproved);
+    } catch (err) {
+      console.error("Failed to authenticate independent Google OAuth user:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -161,100 +200,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const email = params.get('email')?.toLowerCase().trim() || '';
         const name = params.get('name') || '';
         const picture = params.get('picture') || '';
+        const role = params.get('role') || '';
+        const permissionsRaw = params.get('permissions') || '';
+        const approvedRaw = params.get('approved') || '';
+        
+        let permissions: string[] | undefined;
+        try {
+          if (permissionsRaw) {
+            permissions = JSON.parse(permissionsRaw);
+          }
+        } catch (_) {}
+        
+        const approved = approvedRaw === 'true';
         
         if (email) {
-          setLoading(true);
           const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
           window.history.replaceState({ path: newUrl }, '', newUrl);
-
-          const authenticateOAuthUser = async () => {
-            try {
-              let matchedAdmin: any = null;
-              
-              if (email === 'supriyos9@gmail.com') {
-                matchedAdmin = {
-                  email: 'supriyos9@gmail.com',
-                  name: name || 'Supriyo (Root Super Admin)',
-                  role: 'super_admin',
-                  permissions: ['*'],
-                  approved: true
-                };
-                
-                await setDoc(doc(db, 'admins', 'supriyos9@gmail.com'), matchedAdmin);
-              } else {
-                const adminDoc = await getDoc(doc(db, 'admins', email));
-                if (adminDoc.exists()) {
-                  matchedAdmin = adminDoc.data();
-                } else {
-                  matchedAdmin = {
-                    email: email,
-                    name: name || email,
-                    role: 'writer',
-                    permissions: ['blog'],
-                    approved: false,
-                    addedAt: new Date().toISOString(),
-                    addedBy: 'self_registration_independent_google'
-                  };
-                  await setDoc(doc(db, 'admins', email), matchedAdmin);
-                }
-              }
-
-              const customUser: CustomUser = {
-                uid: 'google_oauth_' + email.replace(/[^a-zA-Z0-9]/g, '_'),
-                email,
-                displayName: name || matchedAdmin.name || email,
-                photoURL: picture,
-                isCustomAuth: true,
-                role: matchedAdmin.role || 'writer',
-                permissions: matchedAdmin.permissions || ['blog'],
-                approved: matchedAdmin.approved !== false
-              };
-
-              localStorage.setItem('custom_admin_user', JSON.stringify(customUser));
-              setUser(customUser);
-              setIsAdmin(true);
-              setRole(customUser.role || 'writer');
-              setPermissions(customUser.permissions || ['blog']);
-              setIsApproved(customUser.approved !== false);
-            } catch (err) {
-              console.error("Failed to authenticate independent Google OAuth user:", err);
-            } finally {
-              setLoading(false);
-            }
-          };
-
-          authenticateOAuthUser();
+          handleGoogleAuthSuccess(email, name, picture, role, permissions, approved);
           return;
         }
       }
-    }
 
-    const savedCustomUser = localStorage.getItem('custom_admin_user');
-    if (savedCustomUser) {
-      try {
-        const parsed = JSON.parse(savedCustomUser);
-        setUser(parsed);
-        setIsAdmin(true);
-        setRole(parsed.role || 'sub_admin');
-        setPermissions(parsed.permissions || ['*']);
-        setIsApproved(parsed.approved !== false);
-      } catch (e) {
-        console.error("Error reading custom user from storage", e);
+      // Add popup message event listener
+      const handleMessage = (event: MessageEvent) => {
+        // Simple domain/origin check
+        const origin = event.origin;
+        if (!origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.includes('vercel.app')) {
+          return;
+        }
+
+        if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+          const { email, name, picture, role, permissions, approved } = event.data;
+          if (email) {
+            console.log("[OAuth Handshake Debug] Received successful auth message via popup postMessage!");
+            handleGoogleAuthSuccess(email, name || '', picture || '', role, permissions, approved);
+          }
+        } else if (event.data?.type === 'OAUTH_AUTH_FAILURE') {
+          console.error("[OAuth Handshake Debug] Received failure message via popup postMessage:", event.data.error);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      
+      const savedCustomUser = localStorage.getItem('custom_admin_user');
+      if (savedCustomUser) {
+        try {
+          const parsed = JSON.parse(savedCustomUser);
+          setUser(parsed);
+          setIsAdmin(true);
+          setRole(parsed.role || 'sub_admin');
+          setPermissions(parsed.permissions || ['*']);
+          setIsApproved(parsed.approved !== false);
+        } catch (e) {
+          console.error("Error reading custom user from storage", e);
+        }
+      } else {
+        setUser(null);
+        setIsAdmin(false);
+        setRole(null);
+        setPermissions(null);
+        setIsApproved(true);
       }
+      setLoading(false);
+
+      return () => {
+        window.removeEventListener('message', handleMessage);
+      };
     } else {
-      setUser(null);
-      setIsAdmin(false);
-      setRole(null);
-      setPermissions(null);
-      setIsApproved(true);
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async () => {
     console.log("[OAuth Handshake Debug] login() triggered. Clearing previous custom_admin_user session from localStorage...");
     localStorage.removeItem('custom_admin_user');
     
+    let oauthUrl = "";
     const clientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
     if (!clientId) {
       console.warn("[OAuth Handshake Debug] Google OAuth Client ID (VITE_GOOGLE_CLIENT_ID) is not configured in the client environment.");
@@ -273,28 +294,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("Malformed Google OAuth Configuration: Client ID must end with .apps.googleusercontent.com");
       }
       
+      const origin = window.location.origin;
+      const callbackPath = origin.includes("vercel.app") ? "/api/auth/callback/google" : "/api/auth/google/callback";
+      const redirectUri = `${origin}${callbackPath}`;
+      oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cleanClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&state=${encodeURIComponent(origin)}`;
+    }
+
+    if (!oauthUrl) {
       try {
-        const origin = window.location.origin;
-        const redirectUri = `${origin}/api/auth/google/callback`;
-        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cleanClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
-        window.location.href = oauthUrl;
-        return;
+        const res = await fetch(`/api/auth/google/url?origin=${encodeURIComponent(window.location.origin)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.url) {
+            oauthUrl = data.url;
+          }
+        }
       } catch (e: any) {
-        console.error("[OAuth Handshake Debug] Client-side direct Google OAuth construction failed:", e);
+        console.warn("[OAuth Handshake Debug] Independent Google Auth URL fetch failed:", e);
       }
     }
 
-    try {
-      const res = await fetch('/api/auth/google/url');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.url) {
-          window.location.href = data.url;
-          return;
-        }
+    if (oauthUrl) {
+      // Open standard popup window
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      console.log("[OAuth Handshake Debug] Opening OAuth provider URL in popup:", oauthUrl);
+      const popup = window.open(
+        oauthUrl,
+        'google_oauth_popup',
+        `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+      );
+      
+      if (!popup) {
+        console.warn("[OAuth Handshake Debug] Popup blocked, falling back to window location redirection.");
+        window.location.href = oauthUrl;
       }
-    } catch (e: any) {
-      console.warn("[OAuth Handshake Debug] Independent Google Auth URL fetch failed:", e);
+      return;
     }
 
     throw new Error(
