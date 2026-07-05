@@ -464,21 +464,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async () => {
     localStorage.removeItem('custom_admin_user');
+    
+    // 1. Try to initialize Google OAuth directly on the client side using VITE_GOOGLE_CLIENT_ID
+    const clientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
+    
+    if (!clientId) {
+      console.warn("[OAuth Handshake] Google OAuth Client ID (VITE_GOOGLE_CLIENT_ID) is not configured in the client environment. Attempting to fall back to backend URL...");
+    } else {
+      const trimmedClientId = clientId.trim();
+      let cleanClientId = trimmedClientId.replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/+$/, "");
+      
+      const hasDomainSuffix = cleanClientId.endsWith(".apps.googleusercontent.com");
+      const hasProtocol = trimmedClientId.includes("://");
+      const isPlaceholder = trimmedClientId.toLowerCase().includes("your_") || trimmedClientId.length < 15;
+      
+      if (hasProtocol) {
+        console.warn(`[OAuth Handshake] Cleaned protocol prefix from VITE_GOOGLE_CLIENT_ID: "${trimmedClientId}" -> "${cleanClientId}"`);
+      }
+      
+      if (isPlaceholder) {
+        const errorMsg = "Malformed Google OAuth Configuration: The Client ID is a placeholder and not a valid Google Cloud Client ID.";
+        console.error(`[OAuth Handshake] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+      
+      if (!hasDomainSuffix) {
+        const errorMsg = `Malformed Google OAuth Configuration: The Client ID "${cleanClientId}" must end with ".apps.googleusercontent.com".`;
+        console.error(`[OAuth Handshake] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+      
+      try {
+        const origin = window.location.origin;
+        const redirectUri = `${origin}/api/auth/google/callback`;
+        
+        console.log(`[OAuth Handshake] Initiating direct client-side Google OAuth redirect:`, {
+          clientId: cleanClientId,
+          redirectUri
+        });
+
+        const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${cleanClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+        
+        window.location.href = oauthUrl;
+        return;
+      } catch (e: any) {
+        console.error("[OAuth Handshake] Client-side direct Google OAuth construction failed, trying backend endpoint:", e);
+      }
+    }
+
+    // 2. Fallback to API endpoint
     try {
+      console.log("[OAuth Handshake] Attempting backend Google OAuth URL retrieval fallback...");
       const res = await fetch('/api/auth/google/url');
       if (res.ok) {
         const data = await res.json();
         if (data.url) {
           window.location.href = data.url;
           return;
+        } else {
+          console.warn("[OAuth Handshake] Backend returned empty URL, probably because VITE_GOOGLE_CLIENT_ID is missing on the server.");
         }
+      } else {
+        console.warn(`[OAuth Handshake] Backend URL retrieval returned status ${res.status}`);
       }
     } catch (e) {
-      console.warn("Independent Google Auth URL fetch failed, falling back to standard Firebase login popup:", e);
+      console.warn("[OAuth Handshake] Independent Google Auth URL fetch failed, trying Firebase popup authentication:", e);
     }
 
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    // 3. Fallback to Firebase authentication
+    try {
+      console.log("[OAuth Handshake] Initiating Firebase standard popup auth fallback...");
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (e: any) {
+      console.error("[OAuth Handshake] Firebase authentication popup failed:", e);
+      throw new Error(`Google Sign-In handshake failed: ${e.message || e}`);
+    }
   };
 
   const loginWithCredentials = async (email: string, passcode: string) => {
