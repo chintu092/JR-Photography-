@@ -2,8 +2,6 @@ import express from "express";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc as fsDoc, getDoc as fsGetDoc, setDoc as fsSetDoc } from "firebase/firestore";
 import fs from "fs";
 
 // Load environment configurations
@@ -11,30 +9,26 @@ dotenv.config();
 
 async function startServer() {
   const app = express();
+  const asyncHandler = (fn: Function) => (req: any, res: any, next: any) => Promise.resolve(fn(req, res, next)).catch(next);
   app.use(express.json());
   const PORT = 3000;
 
-  // Initialize secure server-side Firebase Client
-  let dbInstance: any = null;
-  let adminDbInstance: any = null; // Kept for backwards compatibility but not populated
+    // We only use REST API in the server to avoid WebChannel socket crashes in Serverless
   let firebaseClientConfig: any = null;
+
   try {
     let configPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (!fs.existsSync(configPath)) {
-      configPath = path.join(__dirname, "..", "firebase-applet-config.json");
+      configPath = path.join(process.cwd(), "..", "firebase-applet-config.json");
     }
-    if (!fs.existsSync(configPath)) {
-      configPath = path.join(__dirname, "firebase-applet-config.json");
-    }
+
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       firebaseClientConfig = config;
-      const firebaseApp = initializeApp(config, "server-app-unique");
-      dbInstance = getFirestore(firebaseApp, config.firestoreDatabaseId);
-      console.log("[Firebase Server Setup] Server-side Firestore client fully constructed!");
+      console.log("[Firebase Server Setup] Loaded Firebase config for REST API!");
     }
   } catch (error) {
-    console.error("[Firebase Server Setup] Failed to build Firestore reference:", error);
+    console.error("[Firebase Server Setup] Failed to load config:", error);
   }
 
   function escapeMongoURI(uri: string): string {
@@ -898,73 +892,41 @@ async function startServer() {
       const picture = googleUser.picture || "";
       
       let matchedAdmin: any = null;
-      if (dbInstance) {
-        try {
-          const adminDocRef = fsDoc(dbInstance, "admins", email);
-          const adminSnap = await fsGetDoc(adminDocRef);
-          const existingData = adminSnap.exists() ? adminSnap.data() : {};
-          
-          if (email === 'supriyos9@gmail.com') {
-            matchedAdmin = {
-              ...existingData,
-              email: 'supriyos9@gmail.com',
-              name: name || existingData.name || 'Supriyo (Root Super Admin)',
-              role: 'super_admin',
-              permissions: ['*'],
-              approved: true
-            };
-          } else if (adminSnap.exists()) {
-            matchedAdmin = {
-              ...existingData,
-              name: name || existingData.name || email,
-              email: email
-            };
-          } else {
-            matchedAdmin = {
-              email: email,
-              name: name || email,
-              role: 'writer',
-              permissions: ['blog'],
-              approved: false,
-              addedAt: new Date().toISOString(),
-              addedBy: 'self_registration_google'
-            };
-          }
-          
-          if (picture) matchedAdmin.picture = picture;
-          await fsSetDoc(adminDocRef, matchedAdmin, { merge: true });
-        } catch (dbErr) {
-          console.error("[OAuth Handshake] Failed to fetch/create admin doc in Firestore Web SDK:", dbErr);
-          // If we failed to write due to permission denied, we still want to log them in locally with the read data or fallback data
-        }
+
+      try {
+         const restData = await fetchFirestoreDocumentRest("admins", email);
+         if (restData) {
+           matchedAdmin = restData;
+         }
+      } catch(restErr) {
+         console.error("[OAuth Handshake] Fallback REST fetch failed", restErr);
       }
 
-      if (!matchedAdmin) {
-        // Fallback if dbInstance failed entirely before matchedAdmin could be built
-        try {
-           const restData = await fetchFirestoreDocumentRest("admins", email);
-           if (restData) {
-             matchedAdmin = restData;
-             if (picture) matchedAdmin.picture = picture;
-           }
-        } catch(restErr) {
-           console.error("[OAuth Handshake] Fallback REST fetch failed", restErr);
-        }
-      }
-
-      if (!matchedAdmin) {
+      if (email === 'supriyos9@gmail.com') {
+        matchedAdmin = {
+          ...matchedAdmin,
+          email: 'supriyos9@gmail.com',
+          name: name || matchedAdmin?.name || 'Supriyo (Root Super Admin)',
+          role: 'super_admin',
+          permissions: ['*'],
+          approved: true
+        };
+      } else if (!matchedAdmin) {
         matchedAdmin = {
           email: email,
           name: name || email,
-          role: email === 'supriyos9@gmail.com' ? 'super_admin' : 'writer',
-          permissions: email === 'supriyos9@gmail.com' ? ['*'] : ['blog'],
-          approved: email === 'supriyos9@gmail.com'
+          role: 'writer',
+          permissions: ['blog'],
+          approved: false,
+          addedAt: new Date().toISOString(),
+          addedBy: 'self_registration_google'
         };
       }
+      
+      if (picture) matchedAdmin.picture = picture;
 
       // Return HTML page that communicates via postMessage (if in a popup) or redirects (if same window)
-      res.setHeader("Content-Type", "text/html");
-      return res.send(`
+      res.setHeader("Content-Type", "text/html"); return res.send(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -1153,8 +1115,8 @@ async function startServer() {
     }
   };
 
-  app.get("/api/auth/google/callback", handleGoogleCallback);
-  app.get("/api/auth/callback/google", handleGoogleCallback);
+  app.get("/api/auth/google/callback", (req, res, next) => handleGoogleCallback(req, res).catch(next));
+  app.get("/api/auth/callback/google", (req, res, next) => handleGoogleCallback(req, res).catch(next));
 
   // Serve public collection content depending on active database engine
   app.get("/api/content/:collectionName", async (req: any, res: any) => {
@@ -1701,9 +1663,9 @@ async function startServer() {
   app.post("/api/mail/send", async (req: any, res: any) => {
     const { formId, formData, mailSubject, mailBody, customRecipient } = req.body;
 
-    if (!dbInstance) {
-      return res.status(500).json({ success: false, message: "Server-side Database connection not configured." });
-    }
+
+
+    
 
     try {
       console.log(`[Wayfic Mailer] Processing submission dispatch for Form ID: ${formId}`);
@@ -1724,17 +1686,6 @@ async function startServer() {
               formConfig = await fetchFirestoreDocumentRest("wayfic_forms", formId);
             } catch (restErr: any) {
               console.log("[Wayfic Mailer] REST API wayfic_forms lookup skipped (using fallback).");
-            }
-          }
-          // 2. Try standard client SDK fallback
-          if (!formConfig && dbInstance) {
-            try {
-              const formSnap = await fsGetDoc(fsDoc(dbInstance, "wayfic_forms", formId));
-              if (formSnap.exists()) {
-                formConfig = formSnap.data();
-              }
-            } catch (fsErr: any) {
-              console.log("[Wayfic Mailer] Client SDK wayfic_forms lookup skipped.");
             }
           }
 
@@ -1761,17 +1712,6 @@ async function startServer() {
             smtp = await fetchFirestoreDocumentRest("settings", "smtp");
           } catch (restErr: any) {
             console.log("[Wayfic Mailer] REST API SMTP lookup skipped (using fallback).");
-          }
-        }
-        // 2. Try standard client SDK fallback
-        if (!smtp && dbInstance) {
-          try {
-            const smtpSnap = await fsGetDoc(fsDoc(dbInstance, "settings", "smtp"));
-            if (smtpSnap.exists()) {
-              smtp = smtpSnap.data();
-            }
-          } catch (fsErr: any) {
-            console.log("[Wayfic Mailer] Client SDK SMTP lookup skipped.");
           }
         }
       } catch (dbErr: any) {
