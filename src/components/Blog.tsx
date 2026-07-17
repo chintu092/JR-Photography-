@@ -5,18 +5,46 @@ import { BlogPost } from "../types";
 import { audioService } from "../utils/audio";
 import { BookOpen, Calendar, Clock, Sparkles, ArrowRight, User, Loader2 } from "lucide-react";
 import { getCollectionData } from "../lib/db-client";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import LazyImage from "./LazyImage";
 
 let _blogCache: BlogPost[] | null = null;
 
 interface BlogProps {
   onSelectBlog: (id: string) => void;
+  pageId?: string;
 }
 
-export default function Blog({ onSelectBlog }: BlogProps) {
+export default function Blog({ onSelectBlog, pageId = "blog" }: BlogProps) {
   const [posts, setPosts] = useState<BlogPost[]>(_blogCache || []);
   const [loading, setLoading] = useState(!_blogCache);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "EDITORIAL PUBLICATION",
+    title: "THE CHRONICLES",
+    subtitle: "An premium dispatch center detailing color science research and medium-format lens physics from our directors on location."
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const pageKey = pageId === "blog" ? "blog" : `blog_${pageId}`;
+        const blogData = data[pageKey] || data.blog;
+        if (blogData) {
+          setHeaderConfig({
+            pretitle: blogData.pretitle || "EDITORIAL PUBLICATION",
+            title: blogData.title || "THE CHRONICLES",
+            subtitle: blogData.subtitle || "An premium dispatch center detailing color science research and medium-format lens physics from our directors on location."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading blog section headers:", error);
+    });
+    return unsub;
+  }, [pageId]);
 
   useEffect(() => {
     async function fetchPosts() {
@@ -58,14 +86,13 @@ export default function Blog({ onSelectBlog }: BlogProps) {
         <div className="text-center max-w-2xl mx-auto mb-16 md:mb-24">
           <div className="inline-flex items-center space-x-2 text-[9px] font-mono tracking-[0.43em] text-luxury-gold uppercase mb-4">
             <BookOpen className="w-4 h-4 animate-pulse" />
-            <span>EDITORIAL PUBLICATION</span>
+            <span>{headerConfig.pretitle}</span>
           </div>
           <h1 className="font-display font-medium text-4xl sm:text-6xl text-luxury-cream uppercase tracking-tight leading-none mb-6">
-            THE CHRONICLE <br />
-            <span className="font-serif italic font-light text-luxury-gold">Refined Thought</span>
+            {headerConfig.title}
           </h1>
           <p className="text-xs sm:text-sm text-luxury-gray leading-relaxed font-light">
-            An premium dispatch center detailing color science research and medium-format lens physics from our directors on location.
+            {headerConfig.subtitle}
           </p>
         </div>
 

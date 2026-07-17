@@ -4,6 +4,8 @@ import { SERVICES } from "../data";
 import { ArrowRight, Sparkles, Check, X, Loader2 } from "lucide-react";
 import { Service } from "../types";
 import { getCollectionData } from "../lib/db-client";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 let _servicesCache: Service[] | null = null;
 
@@ -11,6 +13,12 @@ export default function Services() {
   const [services, setServices] = useState<Service[]>(_servicesCache || []);
   const [loading, setLoading] = useState(!_servicesCache);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "SPECIALTIES",
+    title: "OUR LUXURY ARCHITECTURES",
+    subtitle: "Each discipline represents an absolute commitment to medium-format precision, bespoke color profiles, and award-winning lighting."
+  });
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -38,6 +46,24 @@ export default function Services() {
     fetchServices();
   }, []);
 
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.services) {
+          setHeaderConfig({
+            pretitle: data.services.pretitle || "SPECIALTIES",
+            title: data.services.title || "OUR LUXURY ARCHITECTURES",
+            subtitle: data.services.subtitle || "Each discipline represents an absolute commitment to medium-format precision, bespoke color profiles, and award-winning lighting."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading services section headers:", error);
+    });
+    return unsub;
+  }, []);
+
   return (
     <section id="services" className="relative py-24 md:py-36 bg-luxury-black overflow-hidden px-6 md:px-12">
       {/* Background ambient lighting glows only */}
@@ -50,14 +76,14 @@ export default function Services() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 md:mb-24 gap-6">
           <div>
             <span className="text-[10px] font-mono tracking-[0.43em] text-luxury-gold uppercase block mb-4">
-              SPECIALTIES
+              {headerConfig.pretitle}
             </span>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-luxury-cream uppercase tracking-wide">
-              OUR LUXURY ARCHITECTURES
+              {headerConfig.title}
             </h2>
           </div>
           <p className="max-w-md text-sm text-luxury-gray leading-relaxed font-light">
-            Each discipline represents an absolute commitment to medium-format precision, bespoke color profiles, and award-winning lighting.
+            {headerConfig.subtitle}
           </p>
         </div>
 

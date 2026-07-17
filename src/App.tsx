@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import Lenis from "lenis";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { AnimatePresence, motion } from "motion/react";
 import { db, handleFirestoreError, OperationType } from "./lib/firebase";
-import { doc, onSnapshot, setDoc, increment } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, increment, collection } from "firebase/firestore";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import CustomCursor from "./components/CustomCursor";
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
@@ -33,6 +33,7 @@ import BlogDetail from "./components/BlogDetail";
 import WorkDetail from "./components/WorkDetail";
 import AdminPanel from "./admin/AdminPanel";
 import SessionTracker from "./components/SessionTracker";
+import CreativeLabs from "./components/CreativeLabs";
 
 // Register ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
@@ -96,6 +97,28 @@ export default function App() {
     ogImageUrl?: string;
     ogType?: string;
   } | null>(null);
+
+  const [sectionSettings, setSectionSettings] = useState<Record<string, { id: string; visible: boolean; order: number }[]>>({});
+  const [dividersConfig, setDividersConfig] = useState<any>({
+    divider_1: {
+      image: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1600",
+      pretitle: "LUXURY WEDDINGS",
+      title: "MOMENTS SUSPENDED",
+      highlightedText: "In the Ether.",
+      description: "Honoring elite matrimonial narratives globally. Operating between Kolkata, domestic destinations, and selective premium destinations worldwide.",
+      alignment: "right" as "left" | "center" | "right",
+      height: "large" as "screen" | "large" | "medium"
+    },
+    divider_2: {
+      image: "https://images.unsplash.com/photo-1549064492-c416b7418968?auto=format&fit=crop&q=80&w=1600",
+      pretitle: "TECHNICAL DEVIATION",
+      title: "SCULPTING LEGACIES",
+      highlightedText: "With Leica and Arri.",
+      description: "A masterwork collection in motion. Operating everywhere between Kolkata, domestic destinations, and curated private villas worldwide.",
+      alignment: "left" as "left" | "center" | "right",
+      height: "medium" as "screen" | "large" | "medium"
+    }
+  });
 
   // Computed SEO based on page and fallback
   const activeSeo = {
@@ -191,6 +214,18 @@ export default function App() {
     return unsub;
   }, []);
 
+  // Sync Dividers configuration
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "dividers"), (docSnap) => {
+      if (docSnap.exists()) {
+        setDividersConfig(docSnap.data());
+      }
+    }, (error) => {
+      console.warn("Failed to subscribe to settings/dividers:", error);
+    });
+    return unsub;
+  }, []);
+
   // Sync Page-specific SEO settings from Firestore
   useEffect(() => {
     if (!currentPage || currentPage === "admin") {
@@ -256,6 +291,25 @@ export default function App() {
     });
     return unsub;
   }, [currentPage]);
+
+  // Sync page sections layout order & visibility from Firestore
+  useEffect(() => {
+    const q = collection(db, "page_sections");
+    const unsub = onSnapshot(q, (snapshot) => {
+      const configs: Record<string, { id: string; visible: boolean; order: number }[]> = {};
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data && data.sections) {
+          const sorted = [...data.sections].sort((a, b) => a.order - b.order);
+          configs[docSnap.id] = sorted;
+        }
+      });
+      setSectionSettings(configs);
+    }, (error) => {
+      console.error("Failed to subscribe to page sections layout config:", error);
+    });
+    return unsub;
+  }, []);
 
   // Real-time Analytics Tracker
   useEffect(() => {
@@ -518,6 +572,178 @@ export default function App() {
     }
 
     // 3. Main Route definitions
+    const homeRenderMap: Record<string, ReactNode> = {
+      marquee: <div key="home-marquee"><LazySection><Marquee /></LazySection></div>,
+      about: <div key="home-about"><LazySection><About /></LazySection></div>,
+      services: <div key="home-services"><LazySection><Services /></LazySection></div>,
+      divider_1: (
+        <div key="home-divider_1">
+          <LazySection>
+            <ParallaxDivider
+              image={dividersConfig.divider_1?.image}
+              pretitle={dividersConfig.divider_1?.pretitle}
+              title={dividersConfig.divider_1?.title}
+              highlightedText={dividersConfig.divider_1?.highlightedText}
+              description={dividersConfig.divider_1?.description}
+              alignment={dividersConfig.divider_1?.alignment}
+              height={dividersConfig.divider_1?.height}
+            />
+          </LazySection>
+        </div>
+      ),
+      creative_labs: <div key="home-creative_labs"><LazySection><CreativeLabs /></LazySection></div>,
+      portfolio: <div key="home-portfolio"><LazySection><Portfolio onSelectWork={(id) => setCurrentPage(`works-detail-${id}`)} /></LazySection></div>,
+      testimonials: <div key="home-testimonials"><Testimonials /></div>,
+      founder: <div key="home-founder"><LazySection><Founder /></LazySection></div>,
+      divider_2: (
+        <div key="home-divider_2">
+          <LazySection>
+            <ParallaxDivider
+              image={dividersConfig.divider_2?.image}
+              pretitle={dividersConfig.divider_2?.pretitle}
+              title={dividersConfig.divider_2?.title}
+              highlightedText={dividersConfig.divider_2?.highlightedText}
+              description={dividersConfig.divider_2?.description}
+              alignment={dividersConfig.divider_2?.alignment}
+              height={dividersConfig.divider_2?.height}
+            />
+          </LazySection>
+        </div>
+      ),
+      exif_explorer: <div key="home-exif_explorer"><LazySection><ExifExplorer /></LazySection></div>,
+      before_after: <div key="home-before_after"><LazySection><BeforeAfter /></LazySection></div>,
+      process: <div key="home-process"><LazySection><Process pageId="home" /></LazySection></div>,
+      pricing: <div key="home-pricing"><LazySection><Pricing /></LazySection></div>,
+      blog: <div key="home-blog"><LazySection><Blog pageId="home" onSelectBlog={(id) => setCurrentPage(`blog-detail-${id}`)} /></LazySection></div>,
+      faq: <div key="home-faq"><LazySection><FAQ pageId="home" /></LazySection></div>,
+      contact: <div key="home-contact"><LazySection><Contact /></LazySection></div>,
+    };
+
+    const renderHomeSections = () => {
+      const defaultOrder = [
+        { id: "marquee", visible: true },
+        { id: "about", visible: true },
+        { id: "services", visible: true },
+        { id: "divider_1", visible: true },
+        { id: "creative_labs", visible: true },
+        { id: "portfolio", visible: true },
+        { id: "testimonials", visible: true },
+        { id: "founder", visible: true },
+        { id: "divider_2", visible: true },
+        { id: "exif_explorer", visible: true },
+        { id: "before_after", visible: true },
+        { id: "process", visible: true },
+        { id: "pricing", visible: true },
+        { id: "blog", visible: true },
+        { id: "faq", visible: true },
+        { id: "contact", visible: true },
+      ];
+      const currentConfig = sectionSettings.home || defaultOrder;
+      return currentConfig
+        .filter(sec => sec.visible)
+        .map(sec => homeRenderMap[sec.id])
+        .filter(Boolean);
+    };
+
+    const aboutRenderMap: Record<string, ReactNode> = {
+      about: <div key="about-content"><About /></div>,
+      divider: (
+        <div key="about-divider">
+          <ParallaxDivider
+            image={dividersConfig.divider_2?.image}
+            pretitle={dividersConfig.divider_2?.pretitle}
+            title={dividersConfig.divider_2?.title}
+            highlightedText={dividersConfig.divider_2?.highlightedText}
+            description={dividersConfig.divider_2?.description}
+            alignment={dividersConfig.divider_2?.alignment}
+            height={dividersConfig.divider_2?.height}
+          />
+        </div>
+      ),
+      faq: <div key="about-faq"><FAQ pageId="about" /></div>,
+    };
+
+    const renderAboutSections = () => {
+      const defaultOrder = [
+        { id: "about", visible: true },
+        { id: "divider", visible: true },
+        { id: "faq", visible: true },
+      ];
+      const currentConfig = sectionSettings.about || defaultOrder;
+      return currentConfig
+        .filter(sec => sec.visible)
+        .map(sec => aboutRenderMap[sec.id])
+        .filter(Boolean);
+    };
+
+    const servicesRenderMap: Record<string, ReactNode> = {
+      services: <div key="services-content"><Services /></div>,
+      process: <div key="services-process"><Process pageId="services" /></div>,
+      pricing: <div key="services-pricing"><Pricing /></div>,
+      faq: <div key="services-faq"><FAQ pageId="services" /></div>,
+    };
+
+    const renderServicesSections = () => {
+      const defaultOrder = [
+        { id: "services", visible: true },
+        { id: "process", visible: true },
+        { id: "pricing", visible: true },
+        { id: "faq", visible: true },
+      ];
+      const currentConfig = sectionSettings.services || defaultOrder;
+      return currentConfig
+        .filter(sec => sec.visible)
+        .map(sec => servicesRenderMap[sec.id])
+        .filter(Boolean);
+    };
+
+    const worksRenderMap: Record<string, ReactNode> = {
+      portfolio: <div key="works-portfolio"><Portfolio onSelectWork={(id) => setCurrentPage(`works-detail-${id}`)} /></div>,
+    };
+
+    const renderWorksSections = () => {
+      const defaultOrder = [
+        { id: "portfolio", visible: true },
+      ];
+      const currentConfig = sectionSettings.works || defaultOrder;
+      return currentConfig
+        .filter(sec => sec.visible)
+        .map(sec => worksRenderMap[sec.id])
+        .filter(Boolean);
+    };
+
+    const blogRenderMap: Record<string, ReactNode> = {
+      blog: <div key="blog-content"><Blog pageId="blog" onSelectBlog={(id) => setCurrentPage(`blog-detail-${id}`)} /></div>,
+    };
+
+    const renderBlogSections = () => {
+      const defaultOrder = [
+        { id: "blog", visible: true },
+      ];
+      const currentConfig = sectionSettings.blog || defaultOrder;
+      return currentConfig
+        .filter(sec => sec.visible)
+        .map(sec => blogRenderMap[sec.id])
+        .filter(Boolean);
+    };
+
+    const contactRenderMap: Record<string, ReactNode> = {
+      contact: <div key="contact-content"><Contact /></div>,
+      faq: <div key="contact-faq"><FAQ pageId="contact" /></div>,
+    };
+
+    const renderContactSections = () => {
+      const defaultOrder = [
+        { id: "contact", visible: true },
+        { id: "faq", visible: true },
+      ];
+      const currentConfig = sectionSettings.contact || defaultOrder;
+      return currentConfig
+        .filter(sec => sec.visible)
+        .map(sec => contactRenderMap[sec.id])
+        .filter(Boolean);
+    };
+
     switch (currentPage) {
       case "admin":
         return (
@@ -542,17 +768,7 @@ export default function App() {
             transition={{ duration: 0.6, ease: "easeInOut" }}
           >
             <AboutHero />
-            <About />
-            <ParallaxDivider
-              image="https://images.unsplash.com/photo-1549064492-c416b7418968?auto=format&fit=crop&q=80&w=1600"
-              pretitle="TECHNICAL DEVIATION"
-              title="SCULPTING LEGACIES"
-              highlightedText="With Leica and Arri."
-              description="A masterwork collection in motion. Operating everywhere between Kolkata, domestic destinations, and curated private villas worldwide."
-              alignment="left"
-              height="medium"
-            />
-            <FAQ pageId="about" />
+            {renderAboutSections()}
           </motion.div>
         );
 
@@ -565,10 +781,7 @@ export default function App() {
             exit={{ opacity: 0, filter: "brightness(0)" }}
             transition={{ duration: 0.6, ease: "easeInOut" }}
           >
-            <Services />
-            <Process />
-            <Pricing />
-            <FAQ pageId="services" />
+            {renderServicesSections()}
           </motion.div>
         );
 
@@ -581,7 +794,7 @@ export default function App() {
             exit={{ opacity: 0, filter: "brightness(0)" }}
             transition={{ duration: 0.6, ease: "easeInOut" }}
           >
-            <Portfolio onSelectWork={(id) => setCurrentPage(`works-detail-${id}`)} />
+            {renderWorksSections()}
           </motion.div>
         );
 
@@ -594,7 +807,7 @@ export default function App() {
             exit={{ opacity: 0, filter: "brightness(0)" }}
             transition={{ duration: 0.6, ease: "easeInOut" }}
           >
-            <Blog onSelectBlog={(id) => setCurrentPage(`blog-detail-${id}`)} />
+            {renderBlogSections()}
           </motion.div>
         );
 
@@ -607,8 +820,7 @@ export default function App() {
             exit={{ opacity: 0, filter: "brightness(0)" }}
             transition={{ duration: 0.6, ease: "easeInOut" }}
           >
-            <Contact />
-            <FAQ pageId="contact" />
+            {renderContactSections()}
           </motion.div>
         );
 
@@ -623,49 +835,7 @@ export default function App() {
             transition={{ duration: 0.6, ease: "easeInOut" }}
           >
             <Hero />
-            <LazySection><Marquee /></LazySection>
-            <LazySection><About /></LazySection>
-            <LazySection><Services /></LazySection>
-            
-            <LazySection>
-              <ParallaxDivider
-                image="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1600"
-                pretitle="LUXURY WEDDINGS"
-                title="MOMENTS SUSPENDED"
-                highlightedText="In the Ether."
-                description="Honoring elite matrimonial narratives globally. Operating between Kolkata, domestic destinations, and selective premium destinations worldwide."
-                alignment="right"
-                height="large"
-              />
-            </LazySection>
-
-            <LazySection><Portfolio onSelectWork={(id) => setCurrentPage(`works-detail-${id}`)} /></LazySection>
-
-            <Testimonials />
-            <LazySection><Founder /></LazySection>
-
-            <LazySection>
-              <ParallaxDivider
-                image="https://images.unsplash.com/photo-1549064492-c416b7418968?auto=format&fit=crop&q=80&w=1600"
-                pretitle="TECHNICAL DEVIATION"
-                title="SCULPTING LEGACIES"
-                highlightedText="With Leica and Arri."
-                description="A masterwork collection in motion. Operating everywhere between Kolkata, domestic destinations, and curated private villas worldwide."
-                alignment="left"
-                height="medium"
-              />
-            </LazySection>
-
-            <LazySection><ExifExplorer /></LazySection>
-            <LazySection><BeforeAfter /></LazySection>
-
-            <LazySection><Process /></LazySection>
-            <LazySection><Pricing /></LazySection>
-
-            <LazySection><Blog onSelectBlog={(id) => setCurrentPage(`blog-detail-${id}`)} /></LazySection>
-
-            <LazySection><FAQ pageId="home" /></LazySection>
-            <LazySection><Contact /></LazySection>
+            {renderHomeSections()}
           </motion.div>
         );
     }

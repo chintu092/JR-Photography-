@@ -266,31 +266,36 @@ export const PROCESS_STEPS: ProcessStep[] = [
     num: "01",
     title: "Discovery & Creative Pitch",
     duration: "Week 1",
-    description: "We deep-dive into your aesthetic values, create a bespoke cinematic moodboard, align lighting philosophies, and define narrative scopes."
+    description: "We deep-dive into your aesthetic values, create a bespoke cinematic moodboard, align lighting philosophies, and define narrative scopes.",
+    image: "https://images.unsplash.com/photo-1512540315028-2c1a6497da04?auto=format&fit=crop&q=80&w=800"
   },
   {
     num: "02",
     title: "Strategic Planning & Cast",
     duration: "Week 2 - 3",
-    description: "Location scouting globally, permits, custom lighting architecture setup, talent casting, scheduling, and gear selection."
+    description: "Location scouting globally, permits, custom lighting architecture setup, talent casting, scheduling, and gear selection.",
+    image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=800"
   },
   {
     num: "03",
     title: "The Shoot Day Experience",
     duration: "Production",
-    description: "Premium on-set craft, high-fidelity film tools, meticulous attention to raw physical detail, and private luxury lounge trailers for clients."
+    description: "Premium on-set craft, high-fidelity film tools, meticulous attention to raw physical detail, and private luxury lounge trailers for clients.",
+    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1200"
   },
   {
     num: "04",
     title: "Cinematic Color & Edit",
     duration: "Post-Production",
-    description: "Ultra-precise selection, fine-art black-and-white developing, hand-calibrated cinematic color-grading profiles, and narrative editing."
+    description: "Ultra-precise selection, fine-art black-and-white developing, hand-calibrated cinematic color-grading profiles, and narrative editing.",
+    image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=600"
   },
   {
     num: "05",
     title: "Premium Gallery & Print",
     duration: "Delivery",
-    description: "Access to private secure digital vault galleries in 8K alongside certified hand-pressed physical linen art volumes delivered globally."
+    description: "Access to private secure digital vault galleries in 8K alongside certified hand-pressed physical linen art volumes delivered globally.",
+    image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800"
   }
 ];
 

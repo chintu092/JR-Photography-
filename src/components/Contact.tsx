@@ -8,32 +8,53 @@ import WayficFormRenderer from "./WayficFormRenderer";
 
 const FALLBACK_STUDIO = {
   city: "KOLKATA STUDIO",
-  address: "Kolkata, West Bengal, India",
-  phone: "+91 98300 00000",
+  address: "Salt Lake City, Sector V, Kolkata, India",
+  phone: "+91 98765 43210",
   hours: "10:00 - 18:00 IST",
-  lat: 48.8688,
-  lng: 2.3312
+  lat: 22.5726,
+  lng: 88.4344
+};
+
+const DEFAULT_CONTACT_DATA = {
+  pretitle: "ESTABLISH VISUAL DOMINANCE",
+  title: "LET’S CREATE something ICONIC.",
+  description: "Direct secure communication lines for selective global clients, commercial brands, and haute couture art requests.",
+  email: "contact@jrphotography.com",
+  phone: "+91 98765 43210",
+  address: "Salt Lake City, Sector V, Kolkata, India"
 };
 
 export default function Contact() {
   const [studio, setStudio] = useState<StudioSettings | typeof FALLBACK_STUDIO>(FALLBACK_STUDIO);
+  const [contactData, setContactData] = useState(DEFAULT_CONTACT_DATA);
 
   useEffect(() => {
-    const fetchStudio = async () => {
+    const fetchStudioAndContact = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "settings", "studio"));
-        if (docSnap.exists()) {
-          setStudio(docSnap.data() as StudioSettings);
+        // Fetch Studio coordinates
+        const studioSnap = await getDoc(doc(db, "settings", "studio"));
+        if (studioSnap.exists()) {
+          setStudio(studioSnap.data() as StudioSettings);
         }
-      } catch (error: any) {
-        if (error?.message && error.message.includes("offline")) {
-          console.warn("Studio settings offline, using defaults.");
-        } else {
-          console.error("Error fetching studio:", error);
+      } catch (error) {
+        console.warn("Studio settings offline/unavailable, using defaults.");
+      }
+
+      try {
+        // Fetch Contact editable content
+        const contactSnap = await getDoc(doc(db, "settings", "contact"));
+        if (contactSnap.exists()) {
+          const data = contactSnap.data();
+          setContactData(prev => ({
+            ...prev,
+            ...data
+          }));
         }
+      } catch (error) {
+        console.warn("Contact settings offline/unavailable, using defaults.");
       }
     };
-    fetchStudio();
+    fetchStudioAndContact();
   }, []);
 
   return (
@@ -52,16 +73,20 @@ export default function Contact() {
             viewport={{ once: true }}
           >
             <Sparkles className="w-4 h-4" />
-            <span>ESTABLISH VISUAL DOMINANCE</span>
+            <span>{contactData.pretitle}</span>
           </motion.div>
           
           <h2 className="font-display font-black text-4xl sm:text-6xl md:text-8xl text-luxury-cream leading-none tracking-[0.08em] uppercase select-none">
-            LET’S CREATE <br />
-            <span className="font-serif italic font-light text-luxury-gold normal-case">something</span> <br />
-            ICONIC.
+            {contactData.title.includes("something") ? (
+              <>
+                {contactData.title.split("something")[0]}
+                <span className="font-serif italic font-light text-luxury-gold normal-case">something</span>
+                {contactData.title.split("something")[1]}
+              </>
+            ) : contactData.title}
           </h2>
           <p className="max-w-md mx-auto text-xs text-luxury-gray font-light leading-relaxed">
-            Direct secure communication lines for selective global clients, commercial brands, and haute couture art requests.
+            {contactData.description}
           </p>
         </div>
 
@@ -101,12 +126,18 @@ export default function Contact() {
                 <div className="space-y-3 font-light text-zinc-400 text-xs">
                   <div className="flex items-start space-x-3.5">
                     <MapPin className="w-4.5 h-4.5 text-luxury-gold shrink-0 mt-0.5" />
-                    <span>{studio.address}</span>
+                    <span>{contactData.address || studio.address}</span>
                   </div>
                   <div className="flex items-center space-x-3.5">
                     <Phone className="w-4.5 h-4.5 text-luxury-gold shrink-0" />
-                    <span>{studio.phone}</span>
+                    <span>{contactData.phone || studio.phone}</span>
                   </div>
+                  {contactData.email && (
+                    <div className="flex items-center space-x-3.5">
+                      <Mail className="w-4.5 h-4.5 text-luxury-gold shrink-0" />
+                      <span>{contactData.email}</span>
+                    </div>
+                  )}
                   <div className="flex items-center space-x-3.5">
                     <Clock className="w-4.5 h-4.5 text-luxury-gold shrink-0" />
                     <span>Business Hours: {studio.hours}</span>
@@ -143,7 +174,7 @@ export default function Contact() {
                     ACTIVE SATELLITE RADAR BEACON
                   </span>
                   <span className="text-xs font-mono font-bold text-luxury-gold uppercase block">
-                    LAT: {studio.lat}° N • LNG: {studio.lng}° E
+                    LAT: {studio.lat || FALLBACK_STUDIO.lat}° N • LNG: {studio.lng || FALLBACK_STUDIO.lng}° E
                   </span>
                 </div>
 
@@ -153,7 +184,7 @@ export default function Contact() {
 
                 <div className="pt-2">
                   <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(studio.address)}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactData.address || studio.address)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center space-x-1.5 text-[9px] font-mono tracking-widest text-luxury-cream hover:text-luxury-gold bg-white/5 hover:bg-white/10 px-4 py-2 border border-white/5 rounded-full transition-colors"

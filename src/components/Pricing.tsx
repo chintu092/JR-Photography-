@@ -5,7 +5,7 @@ import { Check, Star, AlertCircle, ArrowRight, Sparkles, Crown, Diamond, Loader2
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { db } from "../lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { PRICING_PLANS as fallbackPricingTiers } from "../data";
 
 interface PricingCardProps {
@@ -288,6 +288,29 @@ export default function Pricing() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [plans, setPlans] = useState<PricingTier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "RESERVATIONS & RATES",
+    title: "INVESTMENTS & RATES",
+    subtitle: "We operate fully customized commissions under premium confidentiality. Select a foundation profile below to initiate your aesthetic direction journey."
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.pricing) {
+          setHeaderConfig({
+            pretitle: data.pricing.pretitle || "RESERVATIONS & RATES",
+            title: data.pricing.title || "INVESTMENTS & RATES",
+            subtitle: data.pricing.subtitle || "We operate fully customized commissions under premium confidentiality. Select a foundation profile below to initiate your aesthetic direction journey."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading pricing section headers:", error);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const fetchTiers = async () => {
@@ -399,14 +422,14 @@ export default function Pricing() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-20 md:mb-28 gap-6">
           <div>
             <span className="text-[10px] font-mono tracking-[0.43em] text-luxury-gold uppercase block mb-4">
-              RESERVATIONS & RATES
+              {headerConfig.pretitle}
             </span>
             <h2 className="font-display font-black text-4xl sm:text-6xl text-luxury-cream uppercase tracking-wide leading-none">
-              INVESTMENTS & RATES
+              {headerConfig.title}
             </h2>
           </div>
           <p className="max-w-md text-sm text-luxury-gray leading-relaxed font-light">
-            We operate fully customized commissions under premium confidentiality. Select a foundation profile below to initiate your aesthetic direction journey.
+            {headerConfig.subtitle}
           </p>
         </div>
 

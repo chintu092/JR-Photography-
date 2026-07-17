@@ -65,6 +65,7 @@ export interface ProcessStep {
   title: string;
   duration: string;
   description: string;
+  image?: string;
 }
 
 export interface PlanVariant {

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Star, Zap, Award } from "lucide-react";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 interface CarouselItem {
   id: string;
@@ -73,6 +75,30 @@ export default function CriticallyAcclaimedCarousel() {
   // Duplicate the list twice to ensure flawless seamless loop
   const duplicatedItems = [...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES];
 
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "CRITICALLY ACCLAIMED DEPT",
+    title: "AVANT-GARDE VISION. METICULOUS PHYSICAL FORMS.",
+    subtitle: "Capturing raw human emotion, sophisticated silhouettes, and high-fashion aesthetics, preserving museum-grade physical visual legacies to cherish forever."
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.critically_acclaimed) {
+          setHeaderConfig({
+            pretitle: data.critically_acclaimed.pretitle || "CRITICALLY ACCLAIMED DEPT",
+            title: data.critically_acclaimed.title || "AVANT-GARDE VISION. METICULOUS PHYSICAL FORMS.",
+            subtitle: data.critically_acclaimed.subtitle || "Capturing raw human emotion, sophisticated silhouettes, and high-fashion aesthetics, preserving museum-grade physical visual legacies to cherish forever."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading critically acclaimed section headers:", error);
+    });
+    return unsub;
+  }, []);
+
   return (
     <div className="w-full flex flex-col items-center">
       
@@ -82,17 +108,17 @@ export default function CriticallyAcclaimedCarousel() {
         {/* Category gold badge identifier */}
         <div className="inline-flex items-center space-x-2 px-3.5 py-1 bg-[#B7BE43]/15 rounded-full border border-[#B7BE43]/20 text-[8.5px] font-mono tracking-[0.25em] text-luxury-gold uppercase mb-5">
           <Star className="w-3 h-3 text-luxury-gold fill-luxury-gold inline mr-0.5 animate-pulse" />
-          <span>CRITICALLY ACCLAIMED DEPT</span>
+          <span>{headerConfig.pretitle}</span>
         </div>
 
         {/* Big centered title - elegant display */}
         <h2 className="font-display font-medium text-3xl sm:text-5xl md:text-6.5xl text-luxury-cream leading-[1.08] uppercase tracking-tight mb-6">
-          AVANT-GARDE VISION.<br />METICULOUS PHYSICAL FORMS.
+          {headerConfig.title}
         </h2>
 
         {/* Editorial description paragraph matching the wedding sample */}
         <p className="text-luxury-gray text-xs sm:text-sm md:text-[14.5px] leading-relaxed font-light mx-auto max-w-2xl">
-          Capturing raw human emotion, sophisticated silhouettes, and high-fashion aesthetics, preserving museum-grade physical visual legacies to cherish forever.
+          {headerConfig.subtitle}
         </p>
       </div>
 

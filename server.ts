@@ -139,6 +139,47 @@ async function startServer() {
     }
   }
 
+  async function createFirestoreDocumentRest(collection: string, data: any): Promise<any> {
+    if (!firebaseClientConfig) {
+      console.warn("[Firestore REST] Cannot write without firebase config");
+      return null;
+    }
+    const { projectId, firestoreDatabaseId, apiKey } = firebaseClientConfig;
+    const dbId = firestoreDatabaseId || "(default)";
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/${collection}?key=${apiKey}`;
+    
+    const fields: any = {};
+    for (const [k, v] of Object.entries(data)) {
+        if (v === null || v === undefined) continue;
+        if (typeof v === 'string') fields[k] = { stringValue: v };
+        else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
+        else if (typeof v === 'number') {
+            if (Number.isInteger(v)) fields[k] = { integerValue: v.toString() };
+            else fields[k] = { doubleValue: v };
+        }
+        else if (typeof v === 'object' && 'timestampValue' in v) {
+            fields[k] = { timestampValue: (v as any).timestampValue };
+        } else if (typeof v === 'object') {
+            fields[k] = { stringValue: JSON.stringify(v) };
+        }
+    }
+
+    try {
+      const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`[Firestore REST] Write error:`, errText);
+      }
+      return await res.json();
+    } catch (err: any) {
+      console.error(`[Firestore REST] Write failed:`, err.message);
+    }
+  }
+
   // Initialize secure server-side Gemini Client
   const geminiKey = process.env.GEMINI_API_KEY;
   let ai: GoogleGenAI | null = null;
@@ -1602,36 +1643,36 @@ async function startServer() {
         subject: subject || "WP-SMTP Styled Test Mail - JR Photography Studio",
         text: body || "Hi there!\n\nThis is a test email confirming that your SMTP server connection is fully functional.\n\nWarm regards,\nJR Photography Studio",
         html: `
-          <div style="font-family: sans-serif; padding: 24px; background-color: #0c0b11; color: #ffffff; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); max-width: 600px; margin: auto;">
-            <div style="border-bottom: 2px solid #cfb53b; padding-bottom: 12px; margin-bottom: 20px;">
-              <h2 style="font-family: serif; color: #cfb53b; margin: 0; font-style: italic;">JR PHOTOGRAPHY</h2>
-              <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4);">SMTP Connection Test Dashboard</span>
+          <div style="font-family: sans-serif; padding: 24px; background-color: #ffffff; color: #333333; border-radius: 16px; border: 1px solid #e0e0e0; max-width: 600px; margin: auto;">
+            <div style="border-bottom: 1px solid #eeeeee; padding-bottom: 12px; margin-bottom: 20px;">
+              <h2 style="font-family: serif; color: #333333; margin: 0; font-style: italic;">JR PHOTOGRAPHY</h2>
+              <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #888888;">SMTP Connection Test Dashboard</span>
             </div>
-            <p style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.85);">
+            <p style="font-size: 14px; line-height: 1.6; color: #444444;">
               Hello! This is a secure verification message confirming that your SMTP settings are successfully synchronized and authenticated in the Admin Suite.
             </p>
-            <div style="background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 16px; border-radius: 12px; margin-block: 20px;">
-              <h4 style="margin: 0 0 10px 0; color: #cfb53b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Connection Metadata</h4>
+            <div style="background-color: rgba(255,255,255,0.03); border: 1px solid #e0e0e0; padding: 16px; border-radius: 12px; margin-block: 20px;">
+              <h4 style="margin: 0 0 10px 0; color: #333333; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Connection Metadata</h4>
               <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
                 <tr>
-                  <td style="padding: 4px 0; color: rgba(255,255,255,0.4); width: 120px;">SMTP Gateway:</td>
+                  <td style="padding: 4px 0; color: #888888; width: 120px;">SMTP Gateway:</td>
                   <td style="padding: 4px 0; font-family: monospace; color: #ffffff;">${host}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 4px 0; color: rgba(255,255,255,0.4);">Port Configured:</td>
+                  <td style="padding: 4px 0; color: #888888;">Port Configured:</td>
                   <td style="padding: 4px 0; font-family: monospace; color: #ffffff;">${port}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 4px 0; color: rgba(255,255,255,0.4);">Security Mode:</td>
+                  <td style="padding: 4px 0; color: #888888;">Security Mode:</td>
                   <td style="padding: 4px 0; font-family: monospace; color: #ffffff;">${secure ? 'SSL/TLS (Implicit)' : 'STARTTLS / Standard'}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 4px 0; color: rgba(255,255,255,0.4);">Sender Signature:</td>
+                  <td style="padding: 4px 0; color: #888888;">Sender Signature:</td>
                   <td style="padding: 4px 0; font-family: monospace; color: #ffffff;">&ldquo;${fromName || 'JR Studio'}&rdquo; &lt;${fromEmail || username || 'no-reply@example.com'}&gt;</td>
                 </tr>
               </table>
             </div>
-            <p style="font-size: 11px; color: rgba(255,255,255,0.3); text-align: center; margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+            <p style="font-size: 11px; color: #999999; text-align: center; margin-top: 30px; border-top: 1px solid #eeeeee; padding-top: 12px;">
               © 2026 JR Photography Studio. Decisive frames of Kolkata, West Bengal.
             </p>
           </div>
@@ -1754,7 +1795,7 @@ async function startServer() {
           finalBody += `<table style="width: 100%; max-width: 600px; border-collapse: collapse; font-family: sans-serif; font-size: 14px;">`;
           for (const [key, val] of Object.entries(formData)) {
             finalBody += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">`;
-            finalBody += `<td style="padding: 10px; font-weight: bold; width: 150px; color: #cfb53b;">${key}:</td>`;
+            finalBody += `<td style="padding: 10px; font-weight: bold; width: 150px; color: #333333;">${key}:</td>`;
             finalBody += `<td style="padding: 10px; color: #ffffff;">${typeof val === 'object' ? JSON.stringify(val) : val}</td>`;
             finalBody += `</tr>`;
           }
@@ -1799,35 +1840,55 @@ async function startServer() {
       // Renders premium HTML wrap or clean text block
       const processedHtml = finalBody.includes("<") && finalBody.includes(">") 
         ? `
-          <div style="font-family: sans-serif; padding: 24px; background-color: #0c0b11; color: #ffffff; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); max-width: 600px; margin: auto;">
-            <div style="border-bottom: 2px solid #cfb53b; padding-bottom: 12px; margin-bottom: 20px;">
-              <h2 style="font-family: serif; color: #cfb53b; margin: 0; font-style: italic;">WAYFIC SECURE SECRETS</h2>
-              <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.4);">${formTitle ? formTitle.toUpperCase() : "Outbound Correspondence Router"}</span>
+          <div style="font-family: sans-serif; padding: 24px; background-color: #ffffff; color: #333333; border-radius: 16px; border: 1px solid #e0e0e0; max-width: 600px; margin: auto;">
+            <div style="border-bottom: 1px solid #eeeeee; padding-bottom: 12px; margin-bottom: 20px;">
+              <h2 style="font-family: serif; color: #333333; margin: 0; font-style: italic;">${smtp.fromName || "Studio Administration"}</h2>
+              <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #888888;">${formTitle ? formTitle.toUpperCase() : "System Notification"}</span>
             </div>
-            <div style="line-height: 1.6; color: rgba(255,255,255,0.85); font-size: 14px;">
+            <div style="line-height: 1.6; color: #444444; font-size: 14px;">
               ${finalBody}
             </div>
-            <p style="font-size: 11px; color: rgba(255,255,255,0.3); text-align: center; margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
-              © 2026 JR Photography Studio. Decisive frames of Kolkata. Secure SMTP Delivery.
+            <p style="font-size: 11px; color: #999999; text-align: center; margin-top: 30px; border-top: 1px solid #eeeeee; padding-top: 12px;">
+              © 2026 JR Photography Studio. Decisive frames of Kolkata. 
             </p>
           </div>
         `
         : `Wayfic Form Submission:\n\n${finalBody}`;
 
+      const textVersion = finalBody.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<\/div>/gi, '\n').replace(/<[^>]*>/g, '').trim();
+
       // 5. Send message
       const info = await transporter.sendMail({
-        from: `"${smtp.fromName || 'Wayfic Form Portal'}" <${smtp.fromEmail || smtp.username || 'no-reply@example.com'}>`,
+        from: `"${smtp.fromName || 'Studio Administration'}" <${smtp.fromEmail || smtp.username || 'no-reply@example.com'}>`,
         to: finalRecipient,
         subject: finalSubject,
-        text: finalBody.replace(/<[^>]*>/g, ""), // strip HTML tags
+        text: textVersion,
         html: processedHtml
       });
 
       console.log(`[Wayfic Mailer] Routed submission mail successfully to ${finalRecipient}. Message ID: ${info.messageId}`);
+      try {
+        await createFirestoreDocumentRest("email_logs", {
+           recipient: finalRecipient,
+           subject: finalSubject,
+           status: "success",
+           messageId: info.messageId,
+           timestamp: { timestampValue: new Date().toISOString() }
+        });
+      } catch(e) {}
       return res.json({ success: true, message: "Submission details sent successfully!", messageId: info.messageId });
 
     } catch (err: any) {
       console.error("[Wayfic Mailer] Message delivery failed:", err.message);
+      try {
+        await createFirestoreDocumentRest("email_logs", {
+           recipient: req.body?.customRecipient || "unknown",
+           subject: req.body?.mailSubject || "Form Email",
+           status: "error",
+           errorMessage: err.message,
+           timestamp: { timestampValue: new Date().toISOString() }
+        });
+      } catch(e) {}
       return res.json({ success: false, message: `SMTP Server Relay Error: ${err.message}` });
     }
   });

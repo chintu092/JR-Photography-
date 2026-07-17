@@ -1,8 +1,36 @@
-import { BRAND_LOGOS } from "../data";
+import { useState, useEffect } from "react";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+
+const DEFAULT_ITEMS = [
+  "FINE ART WEDDINGS",
+  "EDITORIAL ESSENCE",
+  "LUXURY STORYTELLING",
+  "CINEMATIC CAPTURES"
+];
 
 export default function Marquee() {
-  // Duplicate logos arrays to ensure seamless infinite looping without gaps
-  const repeatedBrands = [...BRAND_LOGOS, ...BRAND_LOGOS, ...BRAND_LOGOS];
+  const [items, setItems] = useState<string[]>(DEFAULT_ITEMS);
+
+  useEffect(() => {
+    async function loadMarqueeData() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "marquee"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.tickerItems && Array.isArray(data.tickerItems) && data.tickerItems.length > 0) {
+            setItems(data.tickerItems);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading marquee settings:", err);
+      }
+    }
+    loadMarqueeData();
+  }, []);
+
+  // Duplicate items array to ensure seamless infinite looping without gaps
+  const repeatedItems = [...items, ...items, ...items, ...items];
 
   return (
     <section className="relative py-12 md:py-16 bg-[#000] border-y border-white/5 overflow-hidden select-none">
@@ -13,13 +41,13 @@ export default function Marquee() {
       {/* Marquee Wrapper Container */}
       <div className="flex w-[300%] overflow-hidden">
         <div className="flex space-x-12 md:space-x-24 animate-marquee whitespace-nowrap py-2">
-          {repeatedBrands.map((brand, index) => (
+          {repeatedItems.map((item, index) => (
             <div
-              key={`${brand.id}-${index}`}
+              key={`${item}-${index}`}
               className="flex items-center space-x-3 text-luxury-cream hover:text-luxury-gold transition-colors duration-400 group cursor-default"
             >
               <span className="text-xl sm:text-2xl md:text-3xl font-display font-black tracking-[0.3em] font-light">
-                {brand.name}
+                {item}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold opacity-45 group-hover:opacity-100 group-hover:scale-125 transition-all duration-300 ml-4 md:ml-10" />
             </div>

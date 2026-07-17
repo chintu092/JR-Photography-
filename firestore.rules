@@ -398,6 +398,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Rules for Email Logs
+    match /email_logs/{logId} {
+      allow list, read: if isAdmin();
+      allow create: if true; // allow server side rest calls
+      allow update, delete: if isAdmin();
+    }
+
     // Rules for Wayfic Managed Forms
     match /wayfic_forms/{formId} {
       allow read: if true;

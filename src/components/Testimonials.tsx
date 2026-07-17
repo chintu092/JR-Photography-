@@ -7,6 +7,8 @@ import { motion } from "motion/react";
 import LazyImage from "./LazyImage";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -115,6 +117,29 @@ function TestimonialCard({ review, index }: TestimonialCardProps) {
 export default function Testimonials() {
   const [reviews, setReviews] = useState<Review[]>(_testimonialsCache || []);
   const [loading, setLoading] = useState(!_testimonialsCache);
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "TESTIMONIALS",
+    title: "Trusted by genius people.",
+    subtitle: "Don't just take our word for it, see what leading publications and visionaries say about working with our high-fidelity design studio."
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.testimonials) {
+          setHeaderConfig({
+            pretitle: data.testimonials.pretitle || "TESTIMONIALS",
+            title: data.testimonials.title || "Trusted by genius people.",
+            subtitle: data.testimonials.subtitle || "Don't just take our word for it, see what leading publications and visionaries say about working with our high-fidelity design studio."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading testimonials section headers:", error);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -180,15 +205,15 @@ export default function Testimonials() {
             <div>
               <div className="flex items-center space-x-2 text-[10px] font-mono tracking-[0.4em] text-luxury-gold uppercase mb-4">
                 <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold animate-[pulse_2s_infinite]" />
-                <span>TESTIMONIALS</span>
+                <span>{headerConfig.pretitle}</span>
               </div>
 
               <h2 className="font-display font-medium text-4xl sm:text-5xl text-luxury-cream leading-[1.1] uppercase tracking-tight mb-5">
-                Trusted by <br className="hidden sm:inline" /> genius people.
+                {headerConfig.title}
               </h2>
 
               <p className="text-luxury-gray text-xs sm:text-sm leading-relaxed font-light mb-8">
-                Don't just take our word for it, see what leading publications and visionaries say about working with our high-fidelity design studio.
+                {headerConfig.subtitle}
               </p>
 
               <button

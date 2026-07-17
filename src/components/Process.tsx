@@ -1,21 +1,70 @@
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { PROCESS_STEPS } from "../data";
 import { Compass, Sliders, Camera, Cpu, BookOpen, Award, CheckCircle2 } from "lucide-react";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import CriticallyAcclaimedCarousel from "./CriticallyAcclaimedCarousel";
+import { ProcessStep } from "../types";
 
-export default function Process() {
-  // Use current process steps from data:
-  // 01: Discovery & Creative Pitch (Week 1)
-  // 02: Strategic Planning & Cast (Week 2 - 3)
-  // 03: The Shoot Day Experience (Production)
-  // 04: Cinematic Color & Edit (Post-Production)
-  // 05: Premium Gallery & Print (Delivery)
+interface ProcessProps {
+  pageId?: string;
+}
 
-  const step01 = PROCESS_STEPS[0];
-  const step02 = PROCESS_STEPS[1];
-  const step03 = PROCESS_STEPS[2];
-  const step04 = PROCESS_STEPS[3];
-  const step05 = PROCESS_STEPS[4];
+export default function Process({ pageId = "home" }: ProcessProps) {
+  // Use current process steps from data or Firestore:
+  const [steps, setSteps] = useState<ProcessStep[]>(PROCESS_STEPS);
+
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "CLIENT EXPERIENCE",
+    title: "THE REVOLVE TIMELINE",
+    subtitle: "An uncompromising five-step operational methodology ensuring absolute precision from moodboard conceptualization to final museum-grade deliverables."
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const pageKey = pageId === "home" ? "process" : `process_${pageId}`;
+        const processData = data[pageKey] || data.process;
+        if (processData) {
+          setHeaderConfig({
+            pretitle: processData.pretitle || "CLIENT EXPERIENCE",
+            title: processData.title || "THE REVOLVE TIMELINE",
+            subtitle: processData.subtitle || "An uncompromising five-step operational methodology ensuring absolute precision from moodboard conceptualization to final museum-grade deliverables."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading process section headers:", error);
+    });
+    return unsub;
+  }, [pageId]);
+
+  useEffect(() => {
+    const unsubSteps = onSnapshot(doc(db, "settings", "process_steps"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.steps && Array.isArray(data.steps) && data.steps.length >= 5) {
+          const merged = data.steps.map((step, idx) => ({
+            ...PROCESS_STEPS[idx],
+            ...step,
+            image: step.image || PROCESS_STEPS[idx]?.image || ""
+          }));
+          setSteps(merged);
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading process steps:", error);
+    });
+    return unsubSteps;
+  }, []);
+
+  const step01 = steps[0] || PROCESS_STEPS[0];
+  const step02 = steps[1] || PROCESS_STEPS[1];
+  const step03 = steps[2] || PROCESS_STEPS[2];
+  const step04 = steps[3] || PROCESS_STEPS[3];
+  const step05 = steps[4] || PROCESS_STEPS[4];
 
   return (
     <section id="process" className="relative py-24 md:py-36 bg-luxury-black overflow-hidden px-6 md:px-12 border-t border-white/5 transition-all duration-300">
@@ -29,14 +78,14 @@ export default function Process() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 md:mb-24 gap-6">
           <div>
             <span className="text-[10px] font-mono tracking-[0.43em] text-luxury-gold uppercase block mb-4">
-              CLIENT EXPERIENCE
+              {headerConfig.pretitle}
             </span>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-luxury-cream uppercase tracking-wide leading-none">
-              THE REVOLVE TIMELINE
+              {headerConfig.title}
             </h2>
           </div>
           <p className="max-w-md text-sm text-luxury-gray leading-relaxed font-light">
-            An uncompromising five-step operational methodology ensuring absolute precision from moodboard conceptualization to final museum-grade deliverables.
+            {headerConfig.subtitle}
           </p>
         </div>
 
@@ -45,7 +94,7 @@ export default function Process() {
           
           {/* Card 1: Phase 01 (Minimalist Up to 14 day Battery Life style) */}
           <motion.div 
-            className="lg:col-span-1 bg-luxury-charcoal/90 p-8 rounded-[32px] min-h-[300px] border border-white/5 flex flex-col justify-between transition-all duration-300 hover:border-luxury-gold/20 hover:shadow-2xl hover:shadow-luxury-gold/5 group"
+            className="lg:col-span-1 bg-luxury-charcoal/90 p-8 rounded-[32px] min-h-[300px] border border-white/5 flex flex-col justify-between transition-all duration-300 hover:border-luxury-gold/20 hover:shadow-2xl hover:shadow-luxury-gold/5 group overflow-hidden relative"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -67,10 +116,23 @@ export default function Process() {
               </p>
             </div>
 
-            <div className="flex items-center space-x-2 pt-2 border-t border-white/5 text-[9px] font-mono tracking-widest text-luxury-gold uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold animate-pulse" />
-              <span>DURATION: {step01.duration}</span>
-            </div>
+            {step01.image && (
+              <div className="h-28 w-full mt-2 -mx-8 -mb-8 overflow-hidden relative select-none rounded-t-[20px] border-t border-white/10">
+                <img 
+                  src={step01.image} 
+                  alt={step01.title} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            )}
+
+            {!step01.image && (
+              <div className="flex items-center space-x-2 pt-2 border-t border-white/5 text-[9px] font-mono tracking-widest text-luxury-gold uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold animate-pulse" />
+                <span>DURATION: {step01.duration}</span>
+              </div>
+            )}
           </motion.div>
 
           {/* Card 2: Phase 02 (Rotating Crown style - peach colored backdrop with bottom cropping image) */}
@@ -102,8 +164,8 @@ export default function Process() {
             {/* Bottom cropping aesthetic image of camera dials / lens */}
             <div className="h-40 w-full mt-4 -mx-8 -mb-8 overflow-hidden relative select-none rounded-t-[20px] border-t border-white/10">
               <img 
-                src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=800" 
-                alt="Tactical Camera Dial" 
+                src={step02.image || "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=800"} 
+                alt={step02.title || "Tactical Camera Dial"} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 referrerPolicy="no-referrer"
               />
@@ -155,8 +217,8 @@ export default function Process() {
             {/* Immersive tall physical shoot illustration / model image */}
             <div className="flex-grow w-full relative select-none overflow-hidden h-[300px] lg:h-auto border-t border-white/5">
               <img 
-                src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1200" 
-                alt="Production Shoot Experience"
+                src={step03.image || "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=1200"} 
+                alt={step03.title || "Production Shoot Experience"}
                 className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
@@ -200,8 +262,8 @@ export default function Process() {
             {/* Bottom cropping color graded photographic close-up */}
             <div className="h-40 w-full mt-4 -mx-8 -mb-8 overflow-hidden relative select-none rounded-t-[20px] border-t border-white/10">
               <img 
-                src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=600" 
-                alt="Color grading palette" 
+                src={step04.image || "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=600"} 
+                alt={step04.title || "Color grading palette"} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 referrerPolicy="no-referrer"
               />
@@ -247,8 +309,8 @@ export default function Process() {
             {/* Overlapping prints image stack on the Right - mimics 'Noise AI' watch layout */}
             <div className="sm:w-1/2 h-44 sm:h-auto min-h-[160px] relative select-none rounded-[24px] overflow-hidden border border-white/5 shadow-inner">
               <img 
-                src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800" 
-                alt="Bespoke Linen Art Books" 
+                src={step05.image || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=800"} 
+                alt={step05.title || "Bespoke Linen Art Books"} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 referrerPolicy="no-referrer"
               />

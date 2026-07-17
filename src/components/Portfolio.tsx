@@ -5,6 +5,8 @@ import { WorkItem } from "../types";
 import { audioService } from "../utils/audio";
 import { X, Sparkles, Play, CheckCircle2, Compass, ChevronLeft, ChevronRight, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { getCollectionData } from "../lib/db-client";
+import { db } from "../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import LazyImage from "./LazyImage";
 import { gsap } from "gsap";
 import { Flip } from "gsap/Flip";
@@ -21,6 +23,27 @@ interface PortfolioProps {
 export default function Portfolio({ onSelectWork }: PortfolioProps) {
   const [portfolioItems, setPortfolioItems] = useState<WorkItem[]>(_portfolioCache || []);
   const [loading, setLoading] = useState<boolean>(!_portfolioCache);
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "STUDIO PORTFOLIO",
+    title: "SELECTED REVERIES"
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.portfolio) {
+          setHeaderConfig({
+            pretitle: data.portfolio.pretitle || "STUDIO PORTFOLIO",
+            title: data.portfolio.title || "SELECTED REVERIES"
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading portfolio section headers:", error);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     async function fetchItems() {
@@ -476,11 +499,10 @@ export default function Portfolio({ onSelectWork }: PortfolioProps) {
           <div>
             <div className="inline-flex items-center space-x-2 text-[9px] font-mono tracking-[0.43em] text-luxury-gold uppercase mb-4">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>STUDIO PORTFOLIO</span>
+              <span>{headerConfig.pretitle}</span>
             </div>
             <h2 className="font-display font-medium text-4xl sm:text-6xl text-luxury-cream uppercase tracking-tight leading-none">
-              SELECTED <br className="hidden sm:inline" />
-              <span className="font-serif italic font-light text-luxury-gold tracking-normal">Masterworks</span>
+              {headerConfig.title}
             </h2>
           </div>
           

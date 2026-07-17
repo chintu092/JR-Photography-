@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth, getDiagnosticAuthMessage } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { db } from "../lib/firebase";
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, orderBy, limit, onSnapshot, where } from "firebase/firestore";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   LogOut, Save, Image as ImageIcon, Loader2, ShieldCheck, 
   AlertCircle, Settings, Globe, Palette, Star, LayoutGrid, 
   FileText, RefreshCw, MapPin, Users, Cpu, HelpCircle,
   Menu, X, Folder, MoreHorizontal, Bell, Plus, MessageCircle, Mail, Database, Compass, Navigation,
-  Key, Activity, Check, Trash2, Sparkles, DollarSign
+  Key, Activity, Check, Trash2, Sparkles, DollarSign, Layers
 } from "lucide-react";
 import SEOSettings from "./components/SEOSettings";
 import ThemeSettings from "./components/ThemeSettings";
@@ -31,10 +31,12 @@ import AssetManager from "./components/AssetManager";
 import ActivityLogManager from "./components/ActivityLogManager";
 import LeadManager from "./components/LeadManager";
 import EmailTemplatesManager from "./components/EmailTemplatesManager";
+import EmailLogManager from "./components/EmailLogManager";
 import WayficFormsManager from "./components/WayficFormsManager";
 import PricingManager from "./components/PricingManager";
 import LiveSessionsManager from "./components/LiveSessionsManager";
 import AutomationTestManager from "./components/AutomationTestManager";
+import PageSectionsManager from "./components/PageSectionsManager";
 import { ShieldAlert } from "lucide-react";
 import Logo from "../components/Logo";
 import { generateSecret, verifyTOTP, getQRCodeUrl, getQRCodeImageUrl } from "../utils/totp";
@@ -60,7 +62,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
   const [whatsappDays, setWhatsappDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [whatsappAwayMessage, setWhatsappAwayMessage] = useState("We are currently away. We'll respond as soon as we're back!");
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "general" | "seo" | "theme" | "hero" | "portfolio" | "blog" | "testimonials" | "pricing" | "process" | "studio" | "community" | "faq" | "navigation" | "database" | "admins" | "subscribers" | "assets" | "activity" | "leads" | "email_templates" | "wayfic_forms" | "live_sessions" | "qa_automation">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "general" | "seo" | "theme" | "hero" | "portfolio" | "blog" | "testimonials" | "pricing" | "process" | "studio" | "community" | "faq" | "navigation" | "database" | "admins" | "subscribers" | "assets" | "activity" | "leads" | "email_templates" | "email_logs" | "wayfic_forms" | "live_sessions" | "qa_automation" | "sections">("dashboard");
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -109,7 +111,16 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [adminToEdit, setAdminToEdit] = useState<string | null>(null);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const notifications = useMemo(() => {
+    return [...pendingUsers, ...activityLogs].sort((a, b) => {
+      const aTime = a.createdAt?.seconds || Date.now() / 1000;
+      const bTime = b.createdAt?.seconds || Date.now() / 1000;
+      return bTime - aTime;
+    });
+  }, [activityLogs, pendingUsers]);
   const [unreadCount, setUnreadCount] = useState(0);
   const notificationRef = useRef<HTMLDivElement>(null);
 
@@ -130,16 +141,41 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
       const q = query(collection(db, "activity_logs"), orderBy("createdAt", "desc"), limit(10));
       const unsub = onSnapshot(q, (snapshot) => {
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setNotifications(logs);
+        setActivityLogs(logs);
         // Extremely simple unread count simulation: just random number or based on count we haven't seen.
         // We'll reset it to 0 when opened.
         setUnreadCount(prev => prev + snapshot.docChanges().filter(change => change.type === "added").length);
       }, (error) => {
         console.error("Error in activity_logs snapshot:", error);
       });
-      return () => unsub();
+
+      let unsubAdmins = () => {};
+      if (currentAdminRole === 'super_admin') {
+        const qAdmins = query(collection(db, "admins"), where("approved", "==", false));
+        unsubAdmins = onSnapshot(qAdmins, (snapshot) => {
+          const pending = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: `pending_${doc.id}`,
+              action: `New User Request`,
+              details: `User ${data.email || doc.id} is waiting for approval.`,
+              category: 'Admin',
+              createdAt: data.addedAt ? { seconds: Math.floor(new Date(data.addedAt).getTime() / 1000) } : { seconds: Date.now() / 1000 },
+              isPendingAdmin: true,
+              adminEmail: data.email || doc.id
+            };
+          });
+          setPendingUsers(pending);
+          setUnreadCount(prev => prev + snapshot.docChanges().filter(change => change.type === "added").length);
+        });
+      }
+
+      return () => {
+        unsub();
+        unsubAdmins();
+      };
     }
-  }, [effectiveIsAdmin, isApproved, loading]);
+  }, [effectiveIsAdmin, isApproved, loading, currentAdminRole]);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -383,8 +419,12 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             setHasTwoFactor(false);
             setTwoFactorVerified(true);
           }
-        } catch (e) {
-          console.error("Error checking 2FA status:", e);
+        } catch (e: any) {
+          if (e?.message?.includes("client is offline")) {
+            console.warn("2FA check skipped: client is offline.");
+          } else {
+            console.error("Error checking 2FA status:", e);
+          }
           setHasTwoFactor(false);
           setTwoFactorVerified(true);
         } finally {
@@ -923,11 +963,13 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               { id: "activity", label: "Activity Log", icon: Activity },
               { id: "live_sessions", label: "Live Sessions", icon: Activity },
               { id: "navigation", label: "Navigation", icon: Compass },
+              { id: "sections", label: "Page Sections", icon: Layers },
               { id: "database", label: "Database Hub", icon: Database },
               { id: "qa_automation", label: "QA & Automation", icon: Cpu },
               { id: "general", label: "Settings", icon: Settings },
               { id: "pricing", label: "Pricing", icon: DollarSign },
               { id: "email_templates", label: "Email Templates", icon: Mail },
+              { id: "email_logs", label: "Email Logs", icon: Mail },
               { id: "testimonials", label: "Reviews", icon: Star },
               { id: "process", label: "Process", icon: RefreshCw },
               { id: "community", label: "Community", icon: Users },
@@ -1012,11 +1054,13 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             { id: "activity", label: "Activity Log", icon: Activity },
             { id: "live_sessions", label: "Live Sessions", icon: Activity },
             { id: "navigation", label: "Navigation", icon: Compass },
+            { id: "sections", label: "Page Sections", icon: Layers },
             { id: "database", label: "Database Hub", icon: Database },
             { id: "qa_automation", label: "QA & Automation", icon: Cpu },
             { id: "general", label: "Settings", icon: Settings },
             { id: "pricing", label: "Pricing", icon: DollarSign },
             { id: "email_templates", label: "Email Templates", icon: Mail },
+            { id: "email_logs", label: "Email Logs", icon: Mail },
             { id: "testimonials", label: "Reviews", icon: Star },
             { id: "process", label: "Process", icon: RefreshCw },
             { id: "community", label: "Community", icon: Users },
@@ -1221,15 +1265,17 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                             <div key={notif.id} className="p-4 hover:bg-white/5 transition-colors cursor-default">
                               <div className="flex items-start gap-3">
                                 <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border ${
-                                  notif.action?.toLowerCase().includes('delete') || notif.action?.toLowerCase().includes('purge') 
+                                  notif.isPendingAdmin 
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                                    : notif.action?.toLowerCase().includes('delete') || notif.action?.toLowerCase().includes('purge') 
                                     ? 'bg-red-500/10 border-red-500/30 text-red-400' 
                                     : notif.action?.toLowerCase().includes('create') || notif.action?.toLowerCase().includes('add')
                                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                                       : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400'
                                 }`}>
-                                  {notif.action?.toLowerCase().includes('delete') ? <Trash2 className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+                                  {notif.isPendingAdmin ? <Users className="w-3 h-3" /> : notif.action?.toLowerCase().includes('delete') ? <Trash2 className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                   <p className="text-xs font-bold text-zinc-200">{notif.action}</p>
                                   <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed line-clamp-2">{notif.details}</p>
                                   <div className="flex items-center gap-2 mt-1.5">
@@ -1240,6 +1286,18 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                                         : 'Just now'}
                                     </span>
                                   </div>
+                                  {notif.isPendingAdmin && currentAdminRole === 'super_admin' && (
+                                    <button
+                                      onClick={() => {
+                                        setActiveTab("admins");
+                                        setAdminToEdit(notif.adminEmail);
+                                        setIsNotificationOpen(false);
+                                      }}
+                                      className="mt-2 text-[10px] font-mono uppercase tracking-widest bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 py-1 px-3 rounded-lg border border-amber-500/20 transition-colors inline-block"
+                                    >
+                                      Review User
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1293,10 +1351,14 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             <Dashboard onTabChange={setActiveTab} />
           ) : activeTab === "database" ? (
             <DatabaseManager />
+          ) : activeTab === "sections" ? (
+            <PageSectionsManager onNavigateToTab={(tabId) => setActiveTab(tabId as any)} />
           ) : activeTab === "admins" ? (
-            <AdminManager />
+            <AdminManager adminToEdit={adminToEdit} clearAdminToEdit={() => setAdminToEdit(null)} />
           ) : activeTab === "email_templates" ? (
             <EmailTemplatesManager />
+          ) : activeTab === "email_logs" ? (
+            <EmailLogManager />
           ) : activeTab === "general" ? (
             <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <div className="space-y-2">

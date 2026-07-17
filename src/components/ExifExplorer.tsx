@@ -5,6 +5,8 @@ import exifr from "exifr";
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -112,6 +114,32 @@ export default function ExifExplorer() {
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function loadExifSettings() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "exif"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.defaultImg) {
+            setImagePreview(data.defaultImg);
+          }
+          if (data.camera || data.lens || data.aperture || data.iso || data.shutterSpeed) {
+            setExifData({
+              camera: data.camera || DEFAULT_EXIF.camera,
+              lens: data.lens || DEFAULT_EXIF.lens,
+              aperture: data.aperture || DEFAULT_EXIF.aperture,
+              iso: data.iso || DEFAULT_EXIF.iso,
+              shutterSpeed: data.shutterSpeed || DEFAULT_EXIF.shutterSpeed
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error loading dynamic exif settings:", err);
+      }
+    }
+    loadExifSettings();
+  }, []);
 
   const formatShutterSpeed = (exposureTime?: number) => {
     if (!exposureTime) return "Unknown";

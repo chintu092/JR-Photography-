@@ -178,6 +178,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         approved: resolvedApproved
       };
 
+      try {
+        const adminDocSnap = await getDoc(doc(db, 'admins', email));
+        if (!adminDocSnap.exists()) {
+          const newRecord = {
+            email,
+            name: name || email,
+            role: resolvedRole,
+            permissions: resolvedPermissions,
+            approved: resolvedApproved,
+            addedAt: new Date().toISOString(),
+            addedBy: 'self_registration_google',
+            photoURL: picture
+          };
+          await setDoc(doc(db, 'admins', email), newRecord);
+          console.log("[AuthContext] Saved new user to Firestore:", email);
+        }
+      } catch (firestoreErr) {
+        console.error("[AuthContext] Failed to save new user to Firestore:", firestoreErr);
+      }
+
       localStorage.setItem('custom_admin_user', JSON.stringify(customUser));
       setUser(customUser);
       setIsAdmin(true);
@@ -391,12 +411,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error("An account already exists for this email address. Please login.");
     }
 
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$*';
+    const array = new Uint32Array(6);
+    window.crypto.getRandomValues(array);
+    let randomPasscode = '';
+    for (let i = 0; i < 6; i++) {
+      randomPasscode += chars[array[i] % chars.length];
+    }
+
     const newRecord = {
       email: emailClean,
       name: name || emailClean,
       role: 'writer' as const,
       permissions: ['blog'],
-      passcode: '2026', 
+      passcode: randomPasscode, 
       addedAt: new Date().toISOString(),
       addedBy: 'self_registration_credentials',
       approved: false

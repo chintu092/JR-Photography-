@@ -4,7 +4,7 @@ import { FAQS } from "../data";
 import { Plus, Minus, HelpCircle, ArrowRight } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { db } from "../lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { FaqItem } from "../types";
 
 interface FAQProps {
@@ -15,6 +15,32 @@ export default function FAQ({ pageId = "home" }: FAQProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [headerConfig, setHeaderConfig] = useState({
+    pretitle: "ACCORDION ARCHIVE",
+    title: "FREQUENT INQUIRIES",
+    subtitle: "Everything you need to know about preparing for medium format campaigns, timelines, copyright, and physical print shipping."
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "section_headers"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const pageKey = pageId === "home" ? "faq" : `faq_${pageId}`;
+        const faqData = data[pageKey] || data.faq;
+        
+        if (faqData) {
+          setHeaderConfig({
+            pretitle: faqData.pretitle || "ACCORDION ARCHIVE",
+            title: faqData.title || "FREQUENT INQUIRIES",
+            subtitle: faqData.subtitle || "Everything you need to know about preparing for medium format campaigns, timelines, copyright, and physical print shipping."
+          });
+        }
+      }
+    }, (error) => {
+      console.warn("Error loading FAQ section headers:", error);
+    });
+    return unsub;
+  }, [pageId]);
 
   useEffect(() => {
     async function loadFaqs() {
@@ -80,13 +106,13 @@ export default function FAQ({ pageId = "home" }: FAQProps) {
         <div className="text-center space-y-4 mb-20">
           <div className="inline-flex items-center space-x-2 text-luxury-gold text-xs tracking-[0.4em] font-mono uppercase">
             <HelpCircle className="w-4 h-4 text-luxury-gold" />
-            <span>ACCORDION ARCHIVE</span>
+            <span>{headerConfig.pretitle}</span>
           </div>
           <h2 className="font-display font-black text-3xl sm:text-5xl text-luxury-cream uppercase tracking-wide">
-            FREQUENT INQUIRIES
+            {headerConfig.title}
           </h2>
           <p className="max-w-md mx-auto text-xs text-luxury-gray font-light leading-relaxed">
-            Everything you need to know about preparing for medium format campaigns, timelines, copyright, and physical print shipping.
+            {headerConfig.subtitle}
           </p>
         </div>
 

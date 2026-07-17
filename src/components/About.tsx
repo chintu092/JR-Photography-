@@ -3,12 +3,63 @@ import { motion } from "motion/react";
 import { Award, Eye, ShieldCheck, Globe, Sparkles, ArrowRight, MoveRight } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function About() {
   const [hoveredWidget, setHoveredWidget] = useState<number | null>(null);
   const textRef = useRef<HTMLDivElement>(null);
+
+  const [data, setData] = useState({
+    badge: "OUR PHILOSOPHY",
+    title: "WE DO NOT RECORD LIGHT. We sculpt it. TO HARNESS THE EXTRAORDINARY.",
+    description1: "Founded in 2011, JR Photography has evolved into an award-winning, premium photography agency, recognized as the best wedding photographer in Kolkata, operating all over India. We bring back your pleasant memories of your special day with utmost care.",
+    description2: "We capture fine-art fashion, elite wedding stories, luxury pre-wedding shoots, and beautiful Bengali ceremonies. Our team frames every candid moment, then weaves the pictures magically to create a value for a lifetime, delivering cinematic reality instead of mechanical defaults.",
+    btn1Text: "Explore Archives",
+    btn1Link: "#works",
+    btn2Text: "Become a client",
+    btn2Link: "#contact",
+    rigorIndex: 98,
+    focalPrecision: "99.8%",
+    colorFidelity: "100% Labs",
+    archivalLifespan: "200+ Yrs",
+    stats: [
+      { val: "15+", lbl: "YEARS OF ESSENCE", desc: "Kolkata workshops" },
+      { val: "500+", lbl: "HIGH-END COMMISSIONS", desc: "Selective fashion editorials" },
+      { val: "100+", lbl: "GLOBAL CLIENTS", desc: "Elite international vault" },
+      { val: "35+", lbl: "ELITE TROPHIES", desc: "Global design certificates" }
+    ],
+    arsenalTitle: "Precision Instruments",
+    arsenalDesc: "We demand absolute technical rigor. Our primary toolset is meticulously curated to deliver uncompromising fidelity, dynamic range, and cinematic depth for large-scale editorial and luxury captures.",
+    gear: [
+      { type: "Medium Format", gear: "Fujifilm GFX 100S", focus: "Studio & High-End Edits" },
+      { type: "Primary 35mm", gear: "Sony Alpha a7R V", focus: "Location & Speed" },
+      { type: "Prime Lenses", gear: "85mm f/1.4 GM", focus: "Cinematic Portraiture" },
+      { type: "Wide Angle", gear: "24-70mm f/2.8 GM II", focus: "Environmental Scope" },
+      { type: "Lighting", gear: "Profoto Pro-11", focus: "Precise Light Sculpting" },
+      { type: "Aerial", gear: "DJI Mavic 3 Cine", focus: "Grand Perspectives" }
+    ]
+  });
+
+  useEffect(() => {
+    async function fetchAbout() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "about"));
+        if (snap.exists()) {
+          const fetched = snap.data();
+          setData(prev => ({
+            ...prev,
+            ...fetched
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching about settings:", error);
+      }
+    }
+    fetchAbout();
+  }, []);
 
   useEffect(() => {
     if (!textRef.current) return;
@@ -62,24 +113,28 @@ export default function About() {
               {/* Pill Badge */}
               <div>
                 <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-full border border-white/10 text-[9px] font-mono font-bold tracking-[0.25em] text-[#B7BE43] uppercase">
-                  OUR PHILOSOPHY <span className="text-white">✦</span>
+                  {data.badge} <span className="text-white">✦</span>
                 </span>
               </div>
 
               {/* Giant Serif Editorial Headline */}
               <h2 className="font-display font-black text-3xl sm:text-4xl md:text-5xl text-white leading-[1.12] tracking-tight uppercase">
-                WE DO NOT RECORD LIGHT. <br />
-                <span className="font-serif italic text-[#B7BE43] font-normal normal-case block my-2">We sculpt it.</span>
-                TO HARNESS THE EXTRAORDINARY.
+                {data.title.includes("We sculpt it.") ? (
+                  <>
+                    {data.title.split("We sculpt it.")[0]}
+                    <span className="font-serif italic text-[#B7BE43] font-normal normal-case block my-2">We sculpt it.</span>
+                    {data.title.split("We sculpt it.")[1]}
+                  </>
+                ) : data.title}
               </h2>
 
               {/* Professional Paragraph Block */}
               <div ref={textRef} className="space-y-4 text-sm sm:text-[15px] text-zinc-300 leading-relaxed font-normal">
                 <p>
-                  Founded in 2011, JR Photography has evolved into an award-winning, premium photography agency, recognized as the best wedding photographer in Kolkata, operating all over India. We bring back your pleasant memories of your special day with utmost care.
+                  {data.description1}
                 </p>
                 <p>
-                  We capture fine-art fashion, elite wedding stories, luxury pre-wedding shoots, and beautiful Bengali ceremonies. Our team frames every candid moment, then weaves the pictures magically to create a value for a lifetime, delivering cinematic reality instead of mechanical defaults.
+                  {data.description2}
                 </p>
               </div>
             </div>
@@ -89,21 +144,29 @@ export default function About() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  document.getElementById("works")?.scrollIntoView({ behavior: "smooth" });
+                  if (data.btn1Link.startsWith("#")) {
+                    document.getElementById(data.btn1Link.replace("#", ""))?.scrollIntoView({ behavior: "smooth" });
+                  } else {
+                    window.location.href = data.btn1Link;
+                  }
                 }}
                 className="bg-[#2a2c16] hover:bg-[#34371b] text-[#b6b335] font-mono text-[10px] sm:text-[11px] font-bold tracking-[0.15em] uppercase px-8 py-3.5 rounded-full transition-colors cursor-pointer"
               >
-                Explore Archives
+                {data.btn1Text}
               </button>
 
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
+                  if (data.btn2Link.startsWith("#")) {
+                    document.getElementById(data.btn2Link.replace("#", ""))?.scrollIntoView({ behavior: "smooth" });
+                  } else {
+                    window.location.href = data.btn2Link;
+                  }
                 }}
                 className="text-[#b6b335] hover:text-white font-mono text-[10px] sm:text-[11px] font-bold tracking-[0.16em] uppercase cursor-pointer transition-all duration-300 py-2 border-b border-[#b6b335]/30 hover:border-[#b6b335]"
               >
-                Become a client
+                {data.btn2Text}
               </button>
             </div>
           </motion.div>
@@ -127,7 +190,6 @@ export default function About() {
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
                   <span className="text-[10px] font-mono font-bold tracking-widest text-white uppercase flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#B7BE43] inline-block animate-ping" />
-                    LENS METRIC 
                   </span>
                   <Sparkles className="w-3.5 h-3.5 text-[#B7BE43]" />
                 </div>
@@ -161,13 +223,13 @@ export default function About() {
                         stroke="url(#dialGrad)"
                         strokeWidth="8"
                         strokeDasharray="230"
-                        strokeDashoffset="12" /* Custom calibrated offset representing 95%+ precision index */
+                        strokeDashoffset={230 - (230 * (data.rigorIndex || 98)) / 100}
                         strokeLinecap="round"
                         className="transition-all duration-1000 ease-out"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center mt-3">
-                      <span className="text-4xl font-display font-black text-white tracking-tight leading-none">98</span>
+                      <span className="text-4xl font-display font-black text-white tracking-tight leading-none">{data.rigorIndex}</span>
                       <span className="text-[7px] font-mono tracking-widest text-[#B7BE43] font-bold uppercase mt-1">RIGOR INDEX</span>
                     </div>
                   </div>
@@ -178,74 +240,57 @@ export default function About() {
               <div className="space-y-3 pt-3 border-t border-white/10 text-[10px] sm:text-xs">
                 <div className="flex justify-between items-center text-white/70">
                   <span>Focal Precision</span>
-                  <span className="font-mono text-white font-bold">99.8%</span>
+                  <span className="font-mono text-white font-bold">{data.focalPrecision}</span>
                 </div>
                 <div className="flex justify-between items-center text-white/70">
                   <span>Color Fidelity</span>
-                  <span className="font-mono text-white font-bold">100% Labs</span>
+                  <span className="font-mono text-white font-bold">{data.colorFidelity}</span>
                 </div>
                 <div className="flex justify-between items-center text-white/70">
                   <span>Archival Lifespan</span>
-                  <span className="font-mono text-white font-bold">200+ Yrs</span>
+                  <span className="font-mono text-white font-bold">{data.archivalLifespan}</span>
                 </div>
               </div>
             </div>
 
             {/* Vertical Stack List (Emulates Recession, Prediction, Base lists) */}
             <div className="w-full md:flex-1 flex flex-col gap-3.5 relative z-10">
-              {[
-                { 
-                  val: "15+", 
-                  lbl: "YEARS OF ESSENCE", 
-                  desc: "Kolkata workshops",
-                  ico: <ShieldCheck className="w-4 h-4 text-olive-green" /> 
-                },
-                { 
-                  val: "500+", 
-                  lbl: "HIGH-END COMMISSIONS", 
-                  desc: "Selective fashion editorials",
-                  ico: <Award className="w-4 h-4 text-olive-green" /> 
-                },
-                { 
-                  val: "100+", 
-                  lbl: "GLOBAL CLIENTS", 
-                  desc: "Elite international vault",
-                  ico: <Globe className="w-4 h-4 text-olive-green" /> 
-                },
-                { 
-                  val: "35+", 
-                  lbl: "ELITE TROPHIES", 
-                  desc: "Global design certificates",
-                  ico: <Eye className="w-4 h-4 text-olive-green" /> 
-                }
-              ].map((stat, i) => (
-                <div
-                  key={i}
-                  className="bg-luxury-black/90 rounded-[20px] p-4 flex items-center justify-between border border-white/5 shadow-md hover:border-white/20 transition-all duration-300"
-                  onMouseEnter={() => setHoveredWidget(i)}
-                  onMouseLeave={() => setHoveredWidget(null)}
-                >
-                  <div className="space-y-1">
-                    <span className="text-[8px] font-mono tracking-widest text-[#999F94] uppercase block">
-                      {stat.lbl}
-                    </span>
-                    <span className="text-xl sm:text-2xl font-display font-extrabold text-white leading-none">
-                      {stat.val}
-                    </span>
-                    <span className="text-[8px] font-mono text-zinc-500 block">
-                      {stat.desc}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end justify-between h-full min-h-[44px]">
-                    <div className="p-1 px-1.5 rounded-md bg-white/5 text-[9px] font-mono text-[#B7BE43] leading-none">
-                      {hoveredWidget === i ? "✦ LIVE" : "ACTIVE"}
+              {data.stats.map((stat, i) => {
+                const icons = [
+                  <ShieldCheck className="w-4 h-4 text-olive-green" />,
+                  <Award className="w-4 h-4 text-olive-green" />,
+                  <Globe className="w-4 h-4 text-olive-green" />,
+                  <Eye className="w-4 h-4 text-olive-green" />
+                ];
+                return (
+                  <div
+                    key={i}
+                    className="bg-luxury-black/90 rounded-[20px] p-4 flex items-center justify-between border border-white/5 shadow-md hover:border-white/20 transition-all duration-300"
+                    onMouseEnter={() => setHoveredWidget(i)}
+                    onMouseLeave={() => setHoveredWidget(null)}
+                  >
+                    <div className="space-y-1">
+                      <span className="text-[8px] font-mono tracking-widest text-[#999F94] uppercase block">
+                        {stat.lbl}
+                      </span>
+                      <span className="text-xl sm:text-2xl font-display font-extrabold text-white leading-none">
+                        {stat.val}
+                      </span>
+                      <span className="text-[8px] font-mono text-zinc-500 block">
+                        {stat.desc}
+                      </span>
                     </div>
-                    <div className="opacity-70 group-hover:opacity-100 mt-2 transition-opacity duration-300">
-                      {stat.ico}
+                    <div className="flex flex-col items-end justify-between h-full min-h-[44px]">
+                      <div className="p-1 px-1.5 rounded-md bg-white/5 text-[9px] font-mono text-[#B7BE43] leading-none">
+                        {hoveredWidget === i ? "✦ LIVE" : "ACTIVE"}
+                      </div>
+                      <div className="opacity-70 group-hover:opacity-100 mt-2 transition-opacity duration-300">
+                        {icons[i % icons.length]}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
           </motion.div>
@@ -265,23 +310,21 @@ export default function About() {
                   THE ARSENAL <span className="text-white">✦</span>
                 </span>
                 <h3 className="font-display font-black text-3xl sm:text-4xl text-white tracking-tight uppercase leading-tight mb-4">
-                  Precision <br />
-                  <span className="font-serif italic text-zinc-400 font-normal normal-case block my-1">Instruments</span>
+                  {data.arsenalTitle.includes("Instruments") ? (
+                    <>
+                      {data.arsenalTitle.split("Instruments")[0]} <br />
+                      <span className="font-serif italic text-zinc-400 font-normal normal-case block my-1">Instruments</span>
+                      {data.arsenalTitle.split("Instruments")[1]}
+                    </>
+                  ) : data.arsenalTitle}
                 </h3>
                 <p className="text-sm text-zinc-400 font-normal leading-relaxed">
-                  We demand absolute technical rigor. Our primary toolset is meticulously curated to deliver uncompromising fidelity, dynamic range, and cinematic depth for large-scale editorial and luxury captures.
+                  {data.arsenalDesc}
                 </p>
               </div>
               
               <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
-                {[
-                  { type: "Medium Format", gear: "Fujifilm GFX 100S", focus: "Studio & High-End Edits" },
-                  { type: "Primary 35mm", gear: "Sony Alpha a7R V", focus: "Location & Speed" },
-                  { type: "Prime Lenses", gear: "85mm f/1.4 GM", focus: "Cinematic Portraiture" },
-                  { type: "Wide Angle", gear: "24-70mm f/2.8 GM II", focus: "Environmental Scope" },
-                  { type: "Lighting", gear: "Profoto Pro-11", focus: "Precise Light Sculpting" },
-                  { type: "Aerial", gear: "DJI Mavic 3 Cine", focus: "Grand Perspectives" },
-                ].map((item, i) => (
+                {data.gear.map((item, i) => (
                   <div key={i} className="bg-black/30 border border-white/5 rounded-2xl p-5 hover:border-white/15 transition-all group">
                     <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-[0.2em] block mb-1 group-hover:text-zinc-400 transition-colors">{item.type}</span>
                     <h4 className="text-white font-display font-medium text-sm tracking-wide uppercase mb-4">{item.gear}</h4>

@@ -3,13 +3,44 @@ import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, Camera, Image as ImageIcon, Sliders, Stars } from "lucide-react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 gsap.registerPlugin(ScrollTrigger);
 
+const DEFAULT_DATA = {
+  pretitle: "VISUAL CALIBRATION",
+  title: "Aesthetic Preservation",
+  description: "Observe the difference. Slide to compare our untouched camera raw capture against our masterfully color-calibrated final image.",
+  beforeImg: "https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=2000",
+  afterImg: "https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=2000",
+  beforeLabel: "Original",
+  afterLabel: "Enhanced"
+};
+
 export default function BeforeAfter() {
+  const [data, setData] = useState(DEFAULT_DATA);
   const [position, setPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadBeforeAfterData() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "before_after"));
+        if (snap.exists()) {
+          const fetched = snap.data();
+          setData(prev => ({
+            ...prev,
+            ...fetched
+          }));
+        }
+      } catch (err) {
+        console.error("Error loading before_after settings:", err);
+      }
+    }
+    loadBeforeAfterData();
+  }, []);
 
   const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
@@ -77,8 +108,6 @@ export default function BeforeAfter() {
     }
   }, []);
 
-  const imageUrl = "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=2000";
-
   return (
     <section className="relative py-24 md:py-36 bg-[#0a0910] overflow-hidden px-4 md:px-6 border-t border-white/5">
       {/* Background ambient glows */}
@@ -141,13 +170,17 @@ export default function BeforeAfter() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 text-[10px] rounded-full border border-white/10 backdrop-blur-md bg-white/5 shadow-xl">
             <Stars className="w-3.5 h-3.5 text-luxury-gold" />
-            <span className="font-bold uppercase tracking-[0.2em] text-white">Before & After</span>
+            <span className="font-bold uppercase tracking-[0.2em] text-white">{data.pretitle}</span>
           </div>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-display text-white tracking-wide">
-            See the <span className="bg-gradient-to-r from-[#9A93F5] to-[#E3C5F5] text-transparent bg-clip-text">Magic</span> in Real Time
+            {data.title.includes("Magic") ? (
+              <>
+                See the <span className="bg-gradient-to-r from-[#9A93F5] to-[#E3C5F5] text-transparent bg-clip-text">Magic</span> in Real Time
+              </>
+            ) : data.title}
           </h2>
           <p className="text-[#a1a1aa] text-base md:text-lg font-light leading-relaxed max-w-2xl mx-auto">
-            One image. Endless possibilities. Move the slider to see how our signature color grading transforms ordinary shots into extraordinary masterpieces.
+            {data.description}
           </p>
         </motion.div>
 
@@ -168,7 +201,7 @@ export default function BeforeAfter() {
             {/* The After Image (Base Layer - Right Side) */}
             <div className="absolute inset-0">
               <img 
-                src="https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=2000" 
+                src={data.afterImg} 
                 alt="After color grading" 
                 className="w-full h-full object-cover object-center pointer-events-none"
               />
@@ -180,9 +213,9 @@ export default function BeforeAfter() {
               style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
             >
               <img 
-                src="https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=2000" 
+                src={data.beforeImg} 
                 alt="Before color grading" 
-                className="w-full h-full object-cover object-center pointer-events-none saturate-50 brightness-90 contrast-75"
+                className={`w-full h-full object-cover object-center pointer-events-none ${data.beforeImg === data.afterImg ? 'saturate-50 brightness-90 contrast-75' : ''}`}
               />
             </div>
 
@@ -190,13 +223,13 @@ export default function BeforeAfter() {
             <div className={`absolute top-6 left-6 z-20 transition-opacity duration-300 before-after-label ${position < 10 ? 'opacity-0' : 'opacity-100'}`}>
               <div className="px-5 py-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/20 flex items-center gap-2 shadow-xl">
                 <div className="w-1.5 h-1.5 rounded-full bg-white/70" />
-                <span className="text-xs font-medium text-white/90">Original</span>
+                <span className="text-xs font-medium text-white/90">{data.beforeLabel}</span>
               </div>
             </div>
 
             <div className={`absolute top-6 right-6 z-20 transition-opacity duration-300 before-after-label ${position > 90 ? 'opacity-0' : 'opacity-100'}`}>
               <div className="px-5 py-2 rounded-full bg-black/40 backdrop-blur-xl border border-white/20 flex items-center gap-2 shadow-xl">
-                <span className="text-xs font-medium text-white/90">Enhanced</span>
+                <span className="text-xs font-medium text-white/90">{data.afterLabel}</span>
                 <div className="w-1.5 h-1.5 rounded-full bg-luxury-gold" />
               </div>
             </div>

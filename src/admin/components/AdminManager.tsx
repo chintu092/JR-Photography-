@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db, handleFirestoreError, OperationType } from "../../lib/firebase";
+import { db, handleFirestoreError, OperationType, logAdminActivity } from "../../lib/firebase";
 import { 
   collection, doc, getDocs, setDoc, deleteDoc, 
   serverTimestamp 
@@ -60,7 +60,12 @@ interface AdminRecord {
 
 import CustomRolesManager from "./CustomRolesManager";
 
-export default function AdminManager() {
+interface AdminManagerProps {
+  adminToEdit?: string | null;
+  clearAdminToEdit?: () => void;
+}
+
+export default function AdminManager({ adminToEdit, clearAdminToEdit }: AdminManagerProps) {
   const { user, role: currentAdminRole, customRoles } = useAuth();
   const toast = useToast();
   const [admins, setAdmins] = useState<AdminRecord[]>([]);
@@ -70,6 +75,18 @@ export default function AdminManager() {
   const [isNew, setIsNew] = useState(false);
   const [activeTab, setActiveTab] = useState<"assign" | "roles">("assign");
   const [message, setMessageRaw] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    if (adminToEdit && admins.length > 0) {
+      const admin = admins.find(a => a.email === adminToEdit);
+      if (admin) {
+        setEditingAdmin(admin);
+        setIsNew(false);
+        setActiveTab("assign");
+      }
+      if (clearAdminToEdit) clearAdminToEdit();
+    }
+  }, [adminToEdit, admins, clearAdminToEdit]);
 
   const setMessage = (msg: { type: "success" | "error"; text: string } | null) => {
     setMessageRaw(msg);
@@ -144,7 +161,7 @@ export default function AdminManager() {
             name: rec.name || "",
             role: rec.role || "sub_admin",
             permissions: rec.permissions || [],
-            passcode: rec.passcode || "2026",
+            passcode: rec.passcode || "",
             addedAt: rec.addedAt || "",
             addedBy: rec.addedBy || "",
             approved: rec.approved !== false,
@@ -172,6 +189,17 @@ export default function AdminManager() {
     setMessage(null);
   };
 
+  const generateSecurePasscode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$*';
+    const array = new Uint32Array(6);
+    window.crypto.getRandomValues(array);
+    let passcode = '';
+    for (let i = 0; i < 6; i++) {
+      passcode += chars[array[i] % chars.length];
+    }
+    return passcode;
+  };
+
   const handleAddNewClick = () => {
     setEditingAdmin({
       documentIds: [],
@@ -179,7 +207,7 @@ export default function AdminManager() {
       name: "",
       role: "sub_admin",
       permissions: ["dashboard", "hero", "portfolio", "blog"],
-      passcode: "2026",
+      passcode: generateSecurePasscode(),
       addedAt: "",
       addedBy: ""
     });
@@ -243,7 +271,7 @@ export default function AdminManager() {
         name: editingAdmin.name || "",
         role: editingAdmin.role || "sub_admin",
         permissions: finalPermissions,
-        passcode: editingAdmin.passcode || "2026",
+        passcode: editingAdmin.passcode || generateSecurePasscode(),
         addedAt: editingAdmin.addedAt || new Date().toISOString(),
         addedBy: editingAdmin.addedBy || user?.email || "unknown",
         approved: editingAdmin.approved !== false,
@@ -263,6 +291,62 @@ export default function AdminManager() {
       
       await Promise.all(promises);
 
+      // Check if we need to send an approval email
+      const previousRecord = admins.find(a => a.email === emailClean);
+      const wasApproved = previousRecord ? previousRecord.approved : false;
+      const isNowApproved = payload.approved;
+
+      if (!wasApproved && isNowApproved) {
+        try {
+          const mailRes = await fetch("/api/mail/send", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              customRecipient: emailClean,
+              mailSubject: "Your Admin Account has been Approved",
+              mailBody: `
+                <div>
+                  <h2 style="color: #333333;">Welcome, ${payload.name || emailClean}!</h2>
+                  <p style="color: #555555;">Your administrator account has been approved.</p>
+                  <p style="color: #555555;">You can now login using your security passcode.</p>
+                  <div style="background: #f9f9f9; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                    <p style="margin:0; color: #888888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Security Passcode</p>
+                    <p style="margin: 10px 0 0; font-family: monospace; font-size: 32px; font-weight: bold; color: #222222; letter-spacing: 4px;">${payload.passcode}</p>
+                  </div>
+                  <p style="color: #555555;">Please keep this passcode secure. If you lose it, you will need to request a reset.</p>
+                </div>
+              `
+            })
+          });
+          const resData = await mailRes.json();
+          if (resData.success) {
+            toast.success("Approval email sent to user!");
+            logAdminActivity(
+              "Email Dispatched",
+              `Approval email successfully sent to ${emailClean}.`,
+              "Admin"
+            );
+          } else {
+            toast.error("Failed to send approval email: " + (resData.message || "Unknown error"));
+            logAdminActivity(
+              "Email Dispatch Failed",
+              `Failed to send approval email to ${emailClean}: ${resData.message || 'Unknown error'}. Ensure SMTP settings are configured.`,
+              "Admin"
+            );
+          }
+        } catch (err: any) {
+          console.error("Failed to send approval email:", err);
+          toast.error("Error sending approval email: " + err.message);
+          logAdminActivity(
+            "Email Dispatch Error",
+            `Network error while sending approval email to ${emailClean}: ${err.message}.`,
+            "Admin"
+          );
+        }
+      }
+
       setMessage({ type: "success", text: "Administrator privileges updated successfully." });
       setTimeout(() => {
         setEditingAdmin(null);
@@ -274,6 +358,41 @@ export default function AdminManager() {
       setMessage({ type: "error", text: "An error occurred while saving. Check your write permissions." });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resendApprovalEmail = async (admin: AdminRecord) => {
+    try {
+      const mailRes = await fetch("/api/mail/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customRecipient: admin.email,
+          mailSubject: "Your Admin Account has been Approved",
+          mailBody: `
+            <div>
+              <h2 style="color: #333333;">Welcome, ${admin.name || admin.email}!</h2>
+              <p style="color: #555555;">Your administrator account has been approved.</p>
+              <p style="color: #555555;">You can now login using your security passcode.</p>
+              <div style="background: #f9f9f9; border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                <p style="margin:0; color: #888888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Security Passcode</p>
+                <p style="margin: 10px 0 0; font-family: monospace; font-size: 32px; font-weight: bold; color: #222222; letter-spacing: 4px;">${admin.passcode || 'Not set - login with Google'}</p>
+              </div>
+              <p style="color: #555555;">Please keep this passcode secure. If you lose it, you will need to request a reset.</p>
+            </div>
+          `
+        })
+      });
+      const resData = await mailRes.json();
+      if (resData.success) {
+        toast.success(`Approval email sent to ${admin.email}!`);
+      } else {
+        toast.error("Failed to send approval email: " + (resData.message || "Unknown error"));
+      }
+    } catch (err: any) {
+      toast.error("Error sending approval email: " + err.message);
     }
   };
 
@@ -479,16 +598,36 @@ export default function AdminManager() {
 
                 {/* Passcode */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-orange-400">Security Passcode / Password</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-orange-400">Security Passcode / Password</label>
+                    <div className="flex items-center gap-3">
+                      {!isNew && (
+                        <button
+                          type="button"
+                          onClick={() => resendApprovalEmail(editingAdmin as AdminRecord)}
+                          className="text-[10px] uppercase font-bold tracking-widest text-[#846df7] hover:text-[#9f8bf8] transition-colors"
+                        >
+                          Send Approval Mail
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditingAdmin({ ...editingAdmin, passcode: generateSecurePasscode() })}
+                        className="text-[10px] uppercase font-bold tracking-widest text-[#cfb53b] hover:text-white transition-colors"
+                      >
+                        Generate Secure
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
                     value={editingAdmin.passcode || ""}
                     onChange={(e) => setEditingAdmin({ ...editingAdmin, passcode: e.target.value })}
-                    placeholder="e.g. 1234"
+                    placeholder="e.g. A3k9P1"
                     className="w-full bg-black/40 border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-luxury-cream focus:outline-none focus:border-orange-400/40 transition-all font-mono"
                   />
-                  <p className="text-[10px] text-zinc-500 font-sans">Passcode required globally to unlock the dashboard sessions.</p>
+                  <p className="text-[10px] text-zinc-500 font-sans">Passcode required globally to unlock the dashboard sessions. 6 characters minimum.</p>
                 </div>
               </div>
 
@@ -791,7 +930,7 @@ export default function AdminManager() {
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Security Passcode:</span>
                             <span className="text-xs bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded border border-orange-500/20 font-mono font-bold tracking-wider">
-                              {adm.passcode || "2026"}
+                              {adm.passcode || "Not Set"}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">

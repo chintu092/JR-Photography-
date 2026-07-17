@@ -1,17 +1,48 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Twitter, Dribbble, Instagram, Camera, Sparkles } from "lucide-react";
 import { audioService } from "../utils/audio";
 import LazyImage from "./LazyImage";
-
-const EXPERIENCES = [
-  { role: "Founder at JR Studio", years: "2024-Now" },
-  { role: "Creative Director at Leica Labs", years: "2018-2024" },
-  { role: "Lead Editorialist at Vogue Paris", years: "2015-2018" },
-  { role: "Associate Photographer at Condé Nast", years: "2011-2015" }
-];
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function Founder() {
+  const [data, setData] = useState({
+    title: "The Founder",
+    badge: "MEET THE CREATIVE DIRECTOR",
+    bgName: "Meet Jayanta",
+    description: "Jayanta Roy is a fine-art photographer and visual system architect focused on crafting bold, functional photographic legacies. He collaborates with elite fashion houses, editorial agencies, and selective matrimonial clients to balance absolute classic analog depth with micro-precision color science. Based in Kolkata, he experiments daily with medium format sensor dynamics in our master studio.",
+    avatar: "/assets/image/Founder/profile.jpg",
+    sealText: "WINNING DESIGNER • SINCE 2011 •",
+    twitter: "https://twitter.com",
+    dribbble: "https://dribbble.com",
+    instagram: "https://instagram.com",
+    experiences: [
+      { role: "Founder at JR Studio", years: "2024-Now" },
+      { role: "Creative Director at Leica Labs", years: "2018-2024" },
+      { role: "Lead Editorialist at Vogue Paris", years: "2015-2018" },
+      { role: "Associate Photographer at Condé Nast", years: "2011-2015" }
+    ]
+  });
+
+  useEffect(() => {
+    async function fetchFounder() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "founder"));
+        if (snap.exists()) {
+          const fetched = snap.data();
+          setData(prev => ({
+            ...prev,
+            ...fetched
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching founder settings:", error);
+      }
+    }
+    fetchFounder();
+  }, []);
+
   const handleHover = () => {
     audioService.playWhoosh();
   };
@@ -25,7 +56,7 @@ export default function Founder() {
       
       {/* Giant ambient background tracking heading matched with mockup */}
       <div className="absolute top-12 left-1/2 -translate-x-1/2 text-[9vw] sm:text-[10vw] font-display font-extrabold text-[#ffffff]/[0.02] select-none uppercase tracking-[0.4em] whitespace-nowrap z-0 pointer-events-none text-center">
-        Meet Jayanta
+        {data.bgName}
       </div>
 
       <div className="max-w-6xl mx-auto relative z-10">
@@ -45,7 +76,7 @@ export default function Founder() {
 
               {/* Founder Image */}
               <LazyImage
-                src="/assets/image/Founder/profile.jpg"
+                src={data.avatar}
                 alt="Jayanta Roy Founder"
                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-[1200ms] ease-out brightness-95 group-hover:scale-[1.03]"
                 containerClassName="w-full h-full"
@@ -57,7 +88,7 @@ export default function Founder() {
               {/* Floating Social Media Icons at bottom-left */}
               <div className="absolute bottom-8 left-8 flex space-x-3.5 z-20">
                 <a
-                  href="https://twitter.com"
+                  href={data.twitter}
                   target="_blank"
                   rel="noreferrer"
                   onClick={handleInteract}
@@ -69,7 +100,7 @@ export default function Founder() {
                   <Twitter className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://dribbble.com"
+                  href={data.dribbble}
                   target="_blank"
                   rel="noreferrer"
                   onClick={handleInteract}
@@ -81,7 +112,7 @@ export default function Founder() {
                   <Dribbble className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://instagram.com"
+                  href={data.instagram}
                   target="_blank"
                   rel="noreferrer"
                   onClick={handleInteract}
@@ -103,7 +134,7 @@ export default function Founder() {
                     </defs>
                     <text fill="var(--luxury-gold)" fontSize="8.5" className="font-mono uppercase font-bold tracking-[0.25em]">
                       <textPath href="#circlePath" startOffset="0%">
-                        WINNING DESIGNER • SINCE 2011 •
+                        {data.sealText}
                       </textPath>
                     </text>
                   </svg>
@@ -126,10 +157,10 @@ export default function Founder() {
             <div className="space-y-4">
               <div className="flex items-center space-x-2 text-[9px] font-mono tracking-[0.45em] text-luxury-gold uppercase">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>MEET THE CREATIVE DIRECTOR</span>
+                <span>{data.badge}</span>
               </div>
               <h2 className="font-display font-medium text-4xl sm:text-5xl text-luxury-cream leading-none uppercase tracking-tight">
-                The Founder
+                {data.title}
               </h2>
             </div>
 
@@ -140,7 +171,7 @@ export default function Founder() {
               viewport={{ once: true }}
               transition={{ delay: 0.2, duration: 0.6 }}
             >
-              Jayanta Roy is a fine-art photographer and visual system architect focused on crafting bold, functional photographic legacies. He collaborates with elite fashion houses, editorial agencies, and selective matrimonial clients to balance absolute classic analog depth with micro-precision color science. Based in Kolkata, he experiments daily with medium format sensor dynamics in our master studio.
+              {data.description}
             </motion.p>
 
             {/* Subtle Divider */}
@@ -148,7 +179,7 @@ export default function Founder() {
 
             {/* Timeline Milestones list matching the mockup mockup */}
             <div className="space-y-5">
-              {EXPERIENCES.map((exp, idx) => (
+              {data.experiences.map((exp, idx) => (
                 <motion.div 
                   key={idx}
                   className="flex justify-between items-center group/item cursor-default border-b border-white/5 pb-4 last:border-b-0 last:pb-0"
